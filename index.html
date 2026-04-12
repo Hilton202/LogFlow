@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="shortcut icon" href="img/logflow_logo.png" type="image/x-icon">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <title>Expedição Pro - LogFlow System</title>
+    <script src="https://unpkg.com/html5-qrcode"></script>
+    <style>
+        :root {
+            --primary: #2563eb; 
+            --success: #16a34a; 
+            --danger: #dc2626;
+            --bg: #f8fafc; 
+            --text-main: #1e293b; 
+            --text-sub: #64748b;
+            --telegram: #0088cc;
+        }
+
+        body { 
+            font-family: 'Segoe UI', system-ui, sans-serif; 
+            background: var(--bg); 
+            margin: 0; 
+            padding: 15px; 
+            color: var(--text-main);
+        }
+
+        .container { max-width: 500px; margin: auto; }
+
+        .header { 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center; 
+            margin-bottom: 20px; 
+        }
+
+        h1 { font-size: 1.2rem; margin: 0; color: var(--text-main); }
+
+        .header-btns { display: flex; gap: 8px; }
+
+        .btn-top {
+            padding: 8px 12px;
+            border-radius: 10px;
+            border: 1px solid #e2e8f0;
+            background: white;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 0.8rem;
+            color: var(--text-main);
+            transition: 0.2s;
+        }
+        .btn-top:hover { background: #f1f5f9; }
+        .btn-logout { color: var(--danger); border-color: #fca5a5; }
+
+        /* Estilo do Botão do Telegram */
+        .btn-telegram {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--telegram);
+            color: white;
+            text-decoration: none;
+            padding: 12px;
+            border-radius: 12px;
+            font-weight: bold;
+            font-size: 0.85rem;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 12px rgba(0, 136, 204, 0.2);
+            transition: 0.3s;
+        }
+        .btn-telegram:active { transform: scale(0.97); }
+        .btn-telegram svg { margin-right: 10px; }
+
+        #reader { 
+            width: 100%; 
+            border-radius: 12px; 
+            overflow: hidden; 
+            margin-bottom: 15px; 
+            border: 2px solid #e2e8f0;
+            background: white;
+        }
+
+        .card { 
+            background: white; 
+            padding: 24px; 
+            border-radius: 16px; 
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05); 
+        }
+
+        .flex-buttons { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 20px; }
+        
+        .btn-tipo { 
+            padding: 14px; 
+            border: 2px solid #f1f5f9; 
+            border-radius: 12px; 
+            cursor: pointer; 
+            font-weight: 700; 
+            text-align: center; 
+            transition: 0.2s;
+        }
+
+        .active-entrada { 
+            border-color: var(--success) !important; 
+            background: #f0fdf4 !important; 
+            color: var(--success) !important; 
+        }
+
+        .active-saida { 
+            border-color: var(--danger) !important; 
+            background: #fef2f2 !important; 
+            color: var(--danger) !important; 
+        }
+
+        .info-estoque {
+            background: #f1f5f9;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            display: none;
+            border-left: 4px solid var(--primary);
+            font-size: 0.9rem;
+        }
+        .info-estoque span { font-weight: bold; color: var(--primary); }
+
+        .btn-main { 
+            width: 100%; 
+            padding: 16px; 
+            border: none; 
+            border-radius: 12px; 
+            color: white; 
+            font-weight: 700; 
+            cursor: pointer; 
+            font-size: 1rem;
+            transition: 0.3s;
+        }
+        .bg-primary { background: var(--primary); margin-bottom: 15px; }
+        .bg-confirm { background: var(--text-main); margin-top: 10px; }
+        .btn-main:active { transform: scale(0.98); }
+
+        input { 
+            width: 100%; 
+            padding: 14px; 
+            margin-bottom: 12px; 
+            border: 1.5px solid #e2e8f0; 
+            border-radius: 10px; 
+            box-sizing: border-box; 
+            font-size: 1rem;
+        }
+        label { 
+            font-size: 0.7rem; 
+            color: var(--text-sub); 
+            font-weight: 800; 
+            text-transform: uppercase; 
+            display: block; 
+            margin-bottom: 4px; 
+        }
+
+        .container-links {
+            display: flex;
+            justify-content: center;
+            gap: 12px;
+            margin: 20px auto;
+            max-width: 500px;
+        }
+
+        .importar, .qrcode {
+            flex: 1;
+            height: 52px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-decoration: none;
+            text-align: center;
+            padding: 0 10px;
+            color: var(--text-sub);  
+            font-weight: 700;
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            border: 2px dashed #cbd5e1; 
+            border-radius: 12px;
+            background: white;
+            transition: all 0.3s ease;
+        }
+
+        .importar:hover, .qrcode:hover {
+            background: #f1f5f9;
+            border-color: var(--primary);
+            color: var(--primary);
+            transform: translateY(-2px);
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+
+    <div class="header">
+        <nav style="display: flex; align-items: center; padding: 10px 20px; background: #fff; border-bottom: 1px solid #e2e8f0;">
+            <img src="img/logflow_logo.png" alt="LogFlow Logo" style="height: 80px; margin-right: 15px;">
+            <span style="font-weight: bold; font-size: 1.2rem; color: #001F5B;">LogFlow</span>
+        </nav>
+        <div class="header-btns">
+            <button onclick="window.location.href='dashboard.html'" class="btn-top">📊 PAINEL</button>
+            <button onclick="logout()" class="btn-top btn-logout">🚪 SAIR</button>
+        </div>
+    </div>
+
+    <a href="https://t.me/LogFlow_Meu_Bot" target="_blank" class="btn-telegram">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="22" y1="2" x2="11" y2="13"></line>
+            <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+        </svg>
+        ATIVAR ALERTAS NO TELEGRAM
+    </a>
+
+    <div id="reader"></div>
+
+    <div class="card">
+        <div class="flex-buttons">
+            <div id="tabEntrada" class="btn-tipo active-entrada" onclick="setTipo('ENTRADA')">📥 ENTRADA</div>
+            <div id="tabSaida" class="btn-tipo" onclick="setTipo('SAIDA')">📤 SAÍDA</div>
+        </div>
+
+        <div id="alertaEstoque" class="info-estoque">
+            Saldo atual em estoque: <span id="saldoAtual">0</span>
+        </div>
+
+        <button class="btn-main bg-primary" onclick="iniciarScanner()">📷 LER QR CODE / BIPE</button>
+        
+        <form id="formEstoque">
+            <label>Código do Produto</label>
+            <input type="text" id="id_produto" list="listaProdutos" placeholder="Bipe ou digite o código..." required>
+            <datalist id="listaProdutos"></datalist>
+            
+            <label>Quantidade</label>
+            <input type="number" id="quantidade" placeholder="Quantidade a movimentar" required>
+            
+            <label>Referência (Opcional)</label>
+            <input type="text" id="referencia" placeholder="Ex: NF 1010 ou Cliente X">
+            
+            <button type="submit" class="btn-main bg-confirm">FINALIZAR LANÇAMENTO</button>
+        </form>
+    </div>
+
+    <div class="container-links">
+        <a href="importa_excel.html" class="importar">📥 Importar Excel</a>
+        <a href="etiquetas.html" class="qrcode">🏷️ Gerar Etiquetas</a>
+    </div>
+</div>
+
+<script type="module">
+    import { logout } from './auth.js';
+    window.logout = logout;
+</script>
+
+<script type="module" src="index.js"></script>
+
+<script>
+    let operacao = "ENTRADA";
+
+    function setTipo(tipo) {
+        operacao = tipo;
+        document.getElementById('tabEntrada').classList.toggle('active-entrada', tipo === 'ENTRADA');
+        document.getElementById('tabSaida').classList.toggle('active-saida', tipo === 'SAIDA');
+        window.dispatchEvent(new CustomEvent('tipoAlterado', { detail: tipo }));
+    }
+
+    function iniciarScanner() {
+        const html5QrCode = new Html5Qrcode("reader");
+        const config = { fps: 15, qrbox: { width: 250, height: 250 } };
+
+        html5QrCode.start(
+            { facingMode: "environment" }, 
+            config, 
+            (decodedText) => {
+                const inputProd = document.getElementById('id_produto');
+                inputProd.value = decodedText;
+                inputProd.dispatchEvent(new Event('change'));
+                if (navigator.vibrate) navigator.vibrate(100);
+                document.getElementById('quantidade').focus();
+            }
+        ).catch(err => console.error("Erro ao iniciar scanner:", err));
+    }
+</script>
+
+</body>
+</html>

@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="shortcut icon" href="img/logflow_logo.png" type="image/x-icon">
+    <title>LogFlow - Migração Excel</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        .card-importacao { background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); text-align: center; }
+        .tabela-previa { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 0.9rem; }
+        .tabela-previa th, .tabela-previa td { padding: 10px; border: 1px solid #eee; text-align: left; }
+        .instrucoes { background: #fff3cd; padding: 15px; border-radius: 8px; margin-bottom: 20px; text-align: left; font-size: 0.85rem; border: 1px solid #ffeeba; }
+        .home {
+            display: inline-block; margin-top: 25px; text-decoration: none; color: #64748b; 
+            font-weight: 600; font-size: 0.9rem; padding: 10px 20px; border-radius: 8px;
+            border: 1px solid #e2e8f0; transition: all 0.3s ease; background: #f8fafc;
+        }
+        .home:hover { background: #f1f5f9; color: #2563eb; border-color: #2563eb; transform: translateY(-2px); }
+        
+        /* Botão começa desativado */
+        #btnProcessar { 
+            width: 100%; margin-top: 20px; border: none; padding: 15px; 
+            border-radius: 8px; font-weight: bold; color: white; 
+            transition: 0.3s; cursor: not-allowed;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container" style="max-width: 800px; margin: auto; padding: 20px;">
+    <h1>📥 Migrar Excel para o LogFlow</h1>
+    
+    <div class="instrucoes">
+        <strong>💡 Inteligência Automática:</strong> O sistema reconhece colunas como 'Materias', 'Código', 'Estoque' ou 'Qtd' automaticamente.
+    </div>
+
+    <div class="card-importacao">
+        <p>Selecione sua planilha (.xlsx ou .csv)</p>
+        <input type="file" id="arquivoExcel" accept=".xlsx, .xls, .csv" style="margin-bottom: 20px;">
+        
+        <table class="tabela-previa" id="tabelaPrevia">
+            </table>
+
+        <button id="btnProcessar" style="background-color: #cbd5e1;" disabled>
+            ✅ CONFIRMAR ENTRADA EM LOTE
+        </button>
+
+        <a href="index.html" class="home">🏠 Voltar ao Início</a>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script type="module" src="importar_excel.js"></script>
+</body>
+</html>

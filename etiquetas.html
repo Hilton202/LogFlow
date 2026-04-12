@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="shortcut icon" href="img/logflow_logo.png" type="image/x-icon">
+    <title>Gerador de Etiquetas - Expedição Pro</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <style>
+        body { background: #f1f5f9; display: flex; justify-content: center; padding: 20px; }
+        .card-gerador { background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); width: 100%; max-width: 500px; text-align: center; }
+        .area-impressao { margin-top: 30px; padding: 20px; border: 2px dashed #cbd5e1; background: white; display: inline-block; }
+        .btn-print { background: #0f172a; color: white; margin-top: 20px; }
+        input { width: 100%; padding: 12px; margin: 10px 0; border: 1px solid #cbd5e1; border-radius: 8px; }
+        @media print { .no-print { display: none; } .area-impressao { border: none; margin: 0; } }
+    </style>
+</head>
+<body>
+
+<div class="card-gerador">
+    <div class="no-print">
+        <h1>🏷️ Gerador de QR Code</h1>
+        <p>Crie etiquetas para identificar seus produtos no estoque.</p>
+        
+        <input type="text" id="inputCodigo" placeholder="Digite o código do produto...">
+        <button class="btn-main" onclick="gerarQR()">GERAR ETIQUETA</button>
+        <button class="btn-main btn-print" onclick="window.print()">🖨️ IMPRIMIR</button>
+        <br><br>
+        <a href="index.html" style="text-decoration: none; color: #2563eb;">← Voltar ao Painel</a>
+    </div>
+
+    <div id="etiquetaFinal" class="area-impressao">
+        <h2 id="labelCodigo" style="margin: 0 0 10px 0; font-family: monospace;">AGUARDANDO...</h2>
+        <div id="qrcode" style="display: flex; justify-content: center;"></div>
+    </div>
+</div>
+<script src="etiquetas.js"></script>
+
+</body>
+</html>

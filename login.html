@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="shortcut icon" href="img/logflow_logo.png" type="image/x-icon">
+    <title>Login - LogFlow System</title>
+    <style>
+        :root {
+            --primary: #2563eb;
+            --primary-hover: #1d4ed8;
+            --bg: #f8fafc;
+            --text-main: #1e293b;
+            --text-sub: #64748b;
+            --danger: #dc2626;
+        }
+
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background-color: var(--bg);
+            margin: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            color: var(--text-main);
+        }
+
+        .login-card {
+            background: white;
+            padding: 40px;
+            border-radius: 20px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.05);
+            width: 100%;
+            max-width: 400px;
+            text-align: center;
+        }
+
+        .logo {
+            font-size: 2rem;
+            font-weight: 800;
+            color: var(--primary);
+            margin-bottom: 10px;
+        }
+
+        p {
+            color: var(--text-sub);
+            margin-bottom: 30px;
+            font-size: 0.95rem;
+        }
+
+        .form-group {
+            text-align: left;
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            font-size: 0.8rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            margin-bottom: 8px;
+            color: var(--text-sub);
+        }
+
+        input {
+            width: 100%;
+            padding: 14px;
+            border: 1.5px solid #e2e8f0;
+            border-radius: 12px;
+            box-sizing: border-box;
+            font-size: 1rem;
+            outline: none;
+            transition: all 0.2s;
+        }
+
+        input:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.1);
+        }
+
+        .btn-login {
+            width: 100%;
+            padding: 16px;
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-size: 1rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: background 0.2s;
+            margin-top: 10px;
+        }
+
+        .btn-login:hover {
+            background-color: var(--primary-hover);
+        }
+
+        #msgErro {
+            color: var(--danger);
+            font-size: 0.85rem;
+            margin-top: 15px;
+            font-weight: 600;
+            display: none; /* Começa escondido */
+        }
+
+        .footer-info {
+            margin-top: 30px;
+            font-size: 0.75rem;
+            color: #cbd5e1;
+        }
+    </style>
+</head>
+<body>
+
+<div class="login-card">
+    <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; margin-bottom: 20px;">
+        <img src="img/logflow_logo.png" alt="LogFlow Logo" style="height: 150px; margin-bottom: 10px;">
+    </div>
+    <p>Acesse o sistema de estoque</p>
+
+    <div class="form-group">
+        <label for="email">E-mail</label>
+        <input type="email" id="email" placeholder="seu@email.com" required>
+    </div>
+
+    <div class="form-group">
+        <label for="password">Senha</label>
+        <input type="password" id="password" placeholder="••••••••" required>
+    </div>
+
+    <button id="btnLogin" class="btn-login">ENTRAR NO SISTEMA</button>
+
+    <div id="msgErro"></div>
+
+    <div class="footer-info">
+        LogFlow System &copy; 2026 - v1.3
+    </div>
+</div>
+
+<script type="module" src="login.js?v=1.6"></script>
+
+</body>
+</html>

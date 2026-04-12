@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <link rel="shortcut icon" href="img/logflow_logo.png" type="image/x-icon">
+    <title>Painel de Controle - LogFlow</title>
+    <style>
+        :root {
+            --primary: #001F5B;
+            --success: #16a34a;
+            --danger: #dc2626;
+            --bg: #f8fafc;
+        }
+
+        html, body { 
+            font-family: 'Segoe UI', system-ui, sans-serif; 
+            background: var(--bg); 
+            margin: 0; 
+            padding: 0; 
+            width: 100%;
+        }
+
+        .container { 
+            width: 100%; 
+            max-width: 1200px; 
+            margin: auto; 
+            padding: 10px;
+            box-sizing: border-box; 
+        }
+
+        /* Navbar com Logo */
+        .navbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px 20px;
+            background: #fff;
+            border-bottom: 1px solid #e2e8f0;
+            margin-bottom: 15px;
+        }
+        .brand { display: flex; align-items: center; }
+        .brand img { height: 50px; margin-right: 10px; }
+        .brand span { font-weight: bold; font-size: 1.4rem; color: var(--primary); }
+
+        .grid-resumo { 
+            display: grid; 
+            grid-template-columns: repeat(3, 1fr); 
+            gap: 8px; 
+            margin-bottom: 15px; 
+        }
+        .card-stats { 
+            background: white;
+            padding: 15px 5px;
+            border-radius: 12px; 
+            text-align: center;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+        .card-stats h2 { font-size: 1.5rem; margin: 5px 0; color: #1e293b; }
+        .card-stats small { font-size: 0.6rem; color: #64748b; font-weight: bold; text-transform: uppercase; }
+
+        .layout-principal { display: flex; flex-direction: column; gap: 15px; }
+
+        .area-tabela { 
+            background: white; 
+            border-radius: 12px; 
+            padding: 15px; 
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+
+        .tabela-wrapper { width: 100%; overflow-x: auto; border-radius: 8px; }
+        table { width: 100%; min-width: 600px; border-collapse: collapse; }
+        th { padding: 12px; font-size: 0.75rem; background: #f8fafc; color: #64748b; text-align: left; text-transform: uppercase; }
+        td { padding: 12px; font-size: 0.85rem; border-bottom: 1px solid #f1f5f9; }
+
+        .btn-main {
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 8px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        .btn-excel { background: var(--success); width: 100%; margin-top: 15px; }
+        
+        input#inputBusca {
+            width: 100%;
+            padding: 12px;
+            border-radius: 8px;
+            border: 1px solid #ddd;
+            margin-bottom: 15px;
+            box-sizing: border-box;
+        }
+
+        @media (min-width: 900px) {
+            .layout-principal { flex-direction: row; }
+            .area-tabela:first-child { flex: 2; }
+            .area-tabela:last-child { flex: 1; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="navbar">
+    <div class="brand">
+        <img src="img/logflow_logo.png" alt="LogFlow">
+        <span>LogFlow</span>
+    </div>
+    <button class="btn-main" onclick="window.location.href='index.html'">📷 SCANNER</button>
+</div>
+
+<div class="container">
+    <div class="grid-resumo">
+        <div class="card-stats" style="border-bottom: 4px solid var(--primary);"><small>VOLUME TOTAL</small><h2 id="totalPecas">0</h2></div>
+        <div class="card-stats" style="border-bottom: 4px solid var(--danger);"><small>ITENS CRÍTICOS</small><h2 id="itensCriticos">0</h2></div>
+        <div class="card-stats" style="border-bottom: 4px solid var(--success);"><small>MOV. MÊS</small><h2 id="movimentacoesHoje">0</h2></div>
+    </div>
+
+    <div class="layout-principal">
+        <div class="area-tabela">
+            <input type="text" id="inputBusca" placeholder="🔍 Pesquisar produto ou código...">
+            <div class="tabela-wrapper">
+                <table id="tabelaEstoque"> <thead>
+                        <tr>
+                            <th>Produto</th>
+                            <th>Saldo</th>
+                            <th>Giro (30d)</th>
+                            <th>Cobertura</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="corpoTabela"></tbody>
+                </table>
+            </div>
+            <button onclick="baixarExcel()" class="btn-main btn-excel">📊 BAIXAR RELATÓRIO EXCEL</button>
+        </div>
+
+        <div class="area-tabela">
+            <h3 style="margin-top:0;">🕒 Histórico Mensal</h3>
+            <div id="listaMovimentos"></div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script type="module" src="dashboard.js"></script>
+</body>
+</html>

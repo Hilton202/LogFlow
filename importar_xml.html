@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="shortcut icon" href="img/logflow_logo.png" type="image/x-icon">
+    <script src="https://cdn.jsdelivr.net/npm/@ericblade/quagga2/dist/quagga.min.js"></script>
+    <title>Importar XML - Entrada em Lote</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        .lista-produtos { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        .lista-produtos th, .lista-produtos td { padding: 10px; border: 1px solid #ddd; text-align: left; }
+        .status-ok { color: green; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div class="card" style="text-align: center;">
+    <h2>🚀 Ações Rápidas</h2>
+    <button class="btn-main" id="btnAbrirCamera" style="background-color: #2196F3;">ESCANEAR CÓDIGO DE BARRAS</button>
+    
+    <div id="camera" style="width: 100%; height: 300px; margin-top: 10px; background: #000; border-radius: 8px; overflow: hidden; display: none;"></div>
+</div>
+
+<div class="container">
+    <h1>📄 Importar Nota Fiscal (XML)</h1>
+    <p>Selecione o arquivo .xml da DANFE para dar entrada automática nos itens.</p>
+
+    <div class="card">
+        <input type="file" id="xmlFile" accept=".xml" style="margin-bottom: 20px;">
+        <button class="btn-main" id="btnProcessar">LER ARQUIVO XML</button>
+    </div>
+
+    <div id="resultado" class="card" style="display: none;">
+        <h3>Itens identificados:</h3>
+        <table class="lista-produtos">
+            <thead>
+                <tr>
+                    <th>Código</th>
+                    <th>Descrição</th>
+                    <th>Qtd</th>
+                </tr>
+            </thead>
+            <tbody id="tabelaItens"></tbody>
+        </table>
+        <br>
+        <button class="btn-main bg-confirm" id="btnConfirmarEntrada">CONFIRMAR ENTRADA DE TUDO</button>
+    </div>
+</div>
+<script src="importar_xml.js"></script>
+<script type="module" src="importar_xml.js"></script>
+</body>
+</html>

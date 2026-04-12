@@ -1,0 +1,153 @@
+:root { --primary: #2563eb; --success: #16a34a; --danger: #dc2626; --bg: #f8fafc; }
+        body { font-family: 'Segoe UI', sans-serif; background: var(--bg); margin: 0; padding: 15px; }
+        .container { max-width: 500px; margin: auto; }
+        h1 { text-align: center; color: #1e293b; font-size: 1.4rem; margin-bottom: 20px; }
+
+        #reader { width: 100%; border-radius: 12px; overflow: hidden; margin-bottom: 15px; }
+        
+        .card { background: white; padding: 20px; border-radius: 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
+        .flex-buttons { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; }
+        
+        .btn-tipo { padding: 15px; border: 2px solid #e2e8f0; border-radius: 10px; cursor: pointer; font-weight: bold; text-align: center; }
+        .btn-tipo.active-entrada { border-color: var(--success); background: #0e140f; color: var(--success); }
+        .btn-tipo.active-saida { border-color: var(--danger); background: #fef2f2; color: var(--danger); }
+
+        .btn-main { width: 100%; padding: 16px; border: none; border-radius: 10px; color: white; font-weight: bold; font-size: 1rem; cursor: pointer; margin-top: 10px; transition: 0.3s; }
+        .bg-primary { background: var(--primary); }
+        .bg-confirm { background: #1e293b; }
+        
+        input { width: 100%; padding: 14px; margin: 10px 0; border: 1px solid #cbd5e1; border-radius: 8px; box-sizing: border-box; font-size: 1rem; }
+        label { font-size: 0.75rem; color: #64748b; font-weight: 700; text-transform: uppercase; }
+
+        .active-entrada { background-color: #ffffff !important; color: #16a34a; }
+        .active-saida { background-color: #f5f0f0 !important; color: white; }
+
+        .btn-excel {
+    width: 100%;
+    padding: 12px 20px;
+    background-color: #15803d; /* Verde Excel */
+    color: white;
+    border: none;
+    border-radius: 10px;
+    font-weight: bold;
+    font-size: 0.9rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    margin-bottom: 15px;
+}
+
+.btn-excel:hover {
+    background-color: #166534;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+}
+
+.btn-excel:active {
+    transform: translateY(0);
+}
+
+/* Pequeno ajuste para os cards do dashboard se quiser alinhar o botão */
+.dashboard-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+/* Estilo do Botão de Exportar Excel */
+.btn-excel {
+    width: 100%;
+    padding: 16px;
+    background-color: #15803d; /* Verde Excel */
+    color: white;
+    border: none;
+    border-radius: 10px;
+    font-weight: bold;
+    font-size: 1rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    margin: 20px 0;
+}
+
+.btn-excel:hover {
+    background-color: #166534;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 12px rgba(0,0,0,0.15);
+}
+
+.btn-excel:active {
+    transform: translateY(0);
+}
+
+/* Estilo para a Barra de Busca */
+.search-container {
+    margin-bottom: 20px;
+}
+
+.input-search {
+    width: 100%;
+    padding: 12px;
+    border: 2px solid #e2e8f0;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    outline: none;
+    transition: border-color 0.3s;
+}
+
+.input-search:focus {
+    border-color: var(--primary);
+}
+
+/* Container para alinhar os botões */
+.container-links {
+    display: flex;
+    justify-content: center;
+    gap: 12px;           /* Espaçamento entre eles */
+    margin: 20px auto;
+    max-width: 500px;    /* Mesma largura do card superior */
+}
+
+/* Estilo unificado para os dois links */
+.importar, .qrcode {
+    flex: 1;             /* Faz os dois terem exatamente o mesmo tamanho */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-decoration: none;
+    text-align: center;
+    padding: 12px 10px;
+    color: var(--text-sub);  
+    font-weight: 700;
+    font-size: 0.7rem;   /* Tamanho de fonte bom para mobile */
+    text-transform: uppercase;
+    border: 2px dashed #cbd5e1; 
+    border-radius: 12px;
+    transition: all 0.3s ease;
+    background: white;
+}
+
+/* Efeito de passar o mouse/clicar */
+.importar:hover, .qrcode:hover {
+    background: #f1f5f9;
+    border-color: var(--primary);
+    color: var(--primary);
+    transform: translateY(-2px);
+}
+
+#camera video {
+    width: 100%;
+    height: auto;
+}
+#camera canvas {
+    display: none; /* Esconde o canvas de debug do Quagga */
+}
