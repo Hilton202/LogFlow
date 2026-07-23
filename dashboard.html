@@ -29,7 +29,6 @@
             box-sizing: border-box; 
         }
 
-        /* Navbar com Logo */
         .navbar {
             display: flex;
             align-items: center;
@@ -39,6 +38,7 @@
             border-bottom: 1px solid #e2e8f0;
             margin-bottom: 15px;
         }
+        
         .brand { display: flex; align-items: center; }
         .brand img { height: 50px; margin-right: 10px; }
         .brand span { font-weight: bold; font-size: 1.4rem; color: var(--primary); }
@@ -49,6 +49,7 @@
             gap: 8px; 
             margin-bottom: 15px; 
         }
+        
         .card-stats { 
             background: white;
             padding: 15px 5px;
@@ -56,10 +57,9 @@
             text-align: center;
             box-shadow: 0 2px 4px rgba(0,0,0,0.05);
         }
+        
         .card-stats h2 { font-size: 1.5rem; margin: 5px 0; color: #1e293b; }
         .card-stats small { font-size: 0.6rem; color: #64748b; font-weight: bold; text-transform: uppercase; }
-
-        .layout-principal { display: flex; flex-direction: column; gap: 15px; }
 
         .area-tabela { 
             background: white; 
@@ -69,7 +69,7 @@
         }
 
         .tabela-wrapper { width: 100%; overflow-x: auto; border-radius: 8px; }
-        table { width: 100%; min-width: 600px; border-collapse: collapse; }
+        table { width: 100%; border-collapse: collapse; }
         th { padding: 12px; font-size: 0.75rem; background: #f8fafc; color: #64748b; text-align: left; text-transform: uppercase; }
         td { padding: 12px; font-size: 0.85rem; border-bottom: 1px solid #f1f5f9; }
 
@@ -82,7 +82,6 @@
             font-weight: bold;
             cursor: pointer;
         }
-        .btn-excel { background: var(--success); width: 100%; margin-top: 15px; }
         
         input#inputBusca {
             width: 100%;
@@ -93,10 +92,19 @@
             box-sizing: border-box;
         }
 
-        @media (min-width: 900px) {
-            .layout-principal { flex-direction: row; }
-            .area-tabela:first-child { flex: 2; }
-            .area-tabela:last-child { flex: 1; }
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #64748b;
+        }
+
+        .error {
+            background: #fef2f2;
+            border: 1px solid #fca5a5;
+            color: #dc2626;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px;
         }
     </style>
 </head>
@@ -112,38 +120,169 @@
 
 <div class="container">
     <div class="grid-resumo">
-        <div class="card-stats" style="border-bottom: 4px solid var(--primary);"><small>VOLUME TOTAL</small><h2 id="totalPecas">0</h2></div>
-        <div class="card-stats" style="border-bottom: 4px solid var(--danger);"><small>ITENS CRÍTICOS</small><h2 id="itensCriticos">0</h2></div>
-        <div class="card-stats" style="border-bottom: 4px solid var(--success);"><small>MOV. MÊS</small><h2 id="movimentacoesHoje">0</h2></div>
+        <div class="card-stats" style="border-bottom: 4px solid var(--primary);">
+            <small>VOLUME TOTAL</small>
+            <h2 id="totalPecas">0</h2>
+        </div>
+        <div class="card-stats" style="border-bottom: 4px solid var(--danger);">
+            <small>ITENS CRÍTICOS</small>
+            <h2 id="itensCriticos">0</h2>
+        </div>
+        <div class="card-stats" style="border-bottom: 4px solid var(--success);">
+            <small>MOV. MÊS</small>
+            <h2 id="movimentacoesHoje">0</h2>
+        </div>
     </div>
 
-    <div class="layout-principal">
-        <div class="area-tabela">
-            <input type="text" id="inputBusca" placeholder="🔍 Pesquisar produto ou código...">
-            <div class="tabela-wrapper">
-                <table id="tabelaEstoque"> <thead>
-                        <tr>
-                            <th>Produto</th>
-                            <th>Saldo</th>
-                            <th>Giro (30d)</th>
-                            <th>Cobertura</th>
-                            <th>Status</th>
-                        </tr>
-                    </thead>
-                    <tbody id="corpoTabela"></tbody>
-                </table>
-            </div>
-            <button onclick="baixarExcel()" class="btn-main btn-excel">📊 BAIXAR RELATÓRIO EXCEL</button>
-        </div>
-
-        <div class="area-tabela">
-            <h3 style="margin-top:0;">🕒 Histórico Mensal</h3>
-            <div id="listaMovimentos"></div>
+    <div class="area-tabela">
+        <input type="text" id="inputBusca" placeholder="🔍 Pesquisar produto ou código...">
+        <div class="tabela-wrapper">
+            <table id="tabelaEstoque">
+                <thead>
+                    <tr>
+                        <th>Produto</th>
+                        <th>Saldo</th>
+                        <th>Giro (30d)</th>
+                        <th>Cobertura</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody id="corpoTabela">
+                    <tr><td colspan="5" class="loading" id="loadingMsg">⏳ Carregando produtos...</td></tr>
+                </tbody>
+            </table>
         </div>
     </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-<script type="module" src="dashboard.js"></script>
+<script type="module">
+import { verificarAutenticacao } from './auth.js';
+verificarAutenticacao();
+
+import { initializeApp, getApps, getApp } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-app.js";
+import { getFirestore, collection, onSnapshot } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore.js";
+import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-auth.js";
+
+const firebaseConfig = {
+    apiKey: "AIzaSyBVu2nD3RJg5q-CH-oyxJvn-6agQw09rsA",
+    authDomain: "sistema-de-estoque-8ff60.firebaseapp.com",
+    projectId: "sistema-de-estoque-8ff60",
+    storageBucket: "sistema-de-estoque-8ff60.firebasestorage.app",
+    messagingSenderId: "350798221431",
+    appId: "1:350798221431:web:ee97b59412b5aa0da2b672"
+};
+
+const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
+const db = getFirestore(app);
+const auth = getAuth(app);
+
+let girosCalculados = {};
+
+// MONITORA AUTENTICAÇÃO
+onAuthStateChanged(auth, (user) => {
+    if (user) {
+        console.log("✅ DASHBOARD - Usuário logado:", user.uid);
+        carregarDados(user.uid);
+    } else {
+        console.log("❌ DASHBOARD - Usuário não logado!");
+        document.getElementById('corpoTabela').innerHTML = '<tr><td colspan="5" class="error">❌ Faça login primeiro!</td></tr>';
+    }
+});
+
+function carregarDados(uid) {
+    console.log("📦 DASHBOARD - Buscando produtos do usuário:", uid);
+    
+    // Busca movimentações pra calcular giro
+    onSnapshot(collection(db, "usuarios", uid, "movimentacoes"), (snapMov) => {
+        console.log("📥 Movimentações encontradas:", snapMov.docs.length);
+        calcularGiros(snapMov.docs);
+    });
+
+    // Busca produtos
+    onSnapshot(collection(db, "usuarios", uid, "produtos"), (snapProd) => {
+        console.log("📦 Produtos encontrados:", snapProd.docs.length);
+        
+        if (snapProd.docs.length === 0) {
+            document.getElementById('corpoTabela').innerHTML = '<tr><td colspan="5" class="loading">⚠️ Nenhum produto cadastrado ainda</td></tr>';
+            return;
+        }
+
+        renderizarProdutos(snapProd.docs);
+    });
+}
+
+function calcularGiros(movimentacoes) {
+    const agora = new Date();
+    const trintaDiasAtras = new Date();
+    trintaDiasAtras.setDate(agora.getDate() - 30);
+    
+    girosCalculados = {};
+
+    movimentacoes.forEach(doc => {
+        const m = doc.data();
+        const dataMov = m.data?.toDate() || new Date();
+        
+        if (m.tipo === "SAIDA" && dataMov >= trintaDiasAtras) {
+            const cod = (m.codigo || "").trim();
+            const qtd = Number(m.quantidade || 0);
+            girosCalculados[cod] = (girosCalculados[cod] || 0) + qtd;
+        }
+    });
+
+    // Divide por 30 dias
+    Object.keys(girosCalculados).forEach(cod => {
+        girosCalculados[cod] = girosCalculados[cod] / 30;
+    });
+
+    console.log("📊 Giros calculados:", girosCalculados);
+}
+
+function renderizarProdutos(docs) {
+    let htmlTabela = "";
+    let criticos = 0;
+    let volumeTotal = 0;
+
+    docs.forEach(docSnap => {
+        const p = docSnap.data();
+        const cod = (p.codigo || docSnap.id).trim();
+        const estoque = Number(p.estoque_atual) || 0;
+        const mediaGiro = girosCalculados[cod] !== undefined ? girosCalculados[cod] : 0;
+        
+        volumeTotal += estoque;
+        let eCritico = false;
+        let textoCobertura = "Sem Saídas";
+
+        if (mediaGiro > 0) {
+            const totalDias = Math.round(estoque / mediaGiro);
+            if (totalDias <= 20) {
+                eCritico = true;
+                criticos++;
+            }
+            textoCobertura = `${totalDias} dias`;
+        }
+
+        htmlTabela += `
+            <tr>
+                <td><strong>${cod}</strong></td>
+                <td style="color: ${eCritico ? '#dc2626' : 'inherit'}; font-weight: bold;">${estoque}</td>
+                <td>${mediaGiro.toFixed(2)}</td>
+                <td>${textoCobertura}</td>
+                <td>
+                    <span style="padding: 4px 8px; border-radius: 6px; background: ${eCritico ? '#fee2e2' : '#f1f5f9'}; color: ${eCritico ? '#dc2626' : '#64748b'}; font-size: 0.7rem; font-weight:bold;">
+                        ${eCritico ? '🛒 COMPRAR' : '✅ OK'}
+                    </span>
+                </td>
+            </tr>`;
+    });
+
+    document.getElementById('corpoTabela').innerHTML = htmlTabela;
+    document.getElementById('totalPecas').innerText = volumeTotal;
+    document.getElementById('itensCriticos').innerText = criticos;
+    document.getElementById('movimentacoesHoje').innerText = docs.length;
+
+    console.log("✅ Dashboard atualizado | Produtos:", docs.length, "| Total:", volumeTotal);
+}
+</script>
+
 </body>
 </html>
