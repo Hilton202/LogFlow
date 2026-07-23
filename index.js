@@ -25,13 +25,13 @@ const TELEGRAM_TOKEN = "8571933477:AAGkfV-8JdctADeumjpyzHLkXAK-Sa9iNrE";
 const TELEGRAM_CHAT_ID = "7048438658";
 
 let operacaoAtual = "ENTRADA";
+let produtosDisponiveis = {}; // Armazena produtos em cache
 
 async function enviarNotificacaoTelegram(mensagem) {
     const url = `https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage?chat_id=${TELEGRAM_CHAT_ID}&text=${encodeURIComponent(mensagem)}`;
     try { await fetch(url); } catch (e) { console.error("Erro Telegram:", e); }
 }
 
-// --- FUNÇÃO PARA CALCULAR GIRO (ÚLTIMOS 30 DIAS) ---
 async function atualizarGiroEVerificarCritico(codigo) {
     try {
         const user = auth.currentUser;
@@ -82,7 +82,7 @@ async function atualizarGiroEVerificarCritico(codigo) {
                             ultimo_alerta_telegram: serverTimestamp()
                         }, { merge: true });
                         
-                        console.log("Notificação enviada e travada por 24h.");
+                        console.log("✅ Notificação enviada e travada por 24h.");
                     }
                 }
             }
@@ -92,87 +92,95 @@ async function atualizarGiroEVerificarCritico(codigo) {
     }
 }
 
-// --- AUTOCOMPLETE - SÓ DO USUÁRIO LOGADO COM LABEL ---
+// --- AUTOCOMPLETE INTELIGENTE ---
 onAuthStateChanged(auth, (user) => {
-    if (!user) return;
-    
-    const datalist = document.getElementById('listaProdutos');
-    if (datalist) {
-        onSnapshot(collection(db, "usuarios", user.uid, "produtos"), (snapshot) => {
-            let options = "";
-            snapshot.forEach(doc => {
-                const dados = doc.data();
-                const codigo = doc.id;
-                const saldo = dados.estoque_atual || 0;
-                options += `<option value="${codigo}">${codigo} - Saldo: ${saldo}</option>`;
-            });
-            datalist.innerHTML = options;
-        });
+    if (!user) {
+        console.log("❌ Usuário não autenticado");
+        return;
     }
+
+    console.log("✅ Monitorando produtos do usuário:", user.uid);
+    
+    // Monitora produtos em tempo real
+    onSnapshot(collection(db, "usuarios", user.uid, "produtos"), (snapshot) => {
+        produtosDisponiveis = {};
+        snapshot.forEach(doc => {
+            const codigo = doc.id;
+            const saldo = doc.data().estoque_atual || 0;
+            produtosDisponiveis[codigo] = saldo;
+        });
+        console.log("📦 Produtos em cache:", Object.keys(produtosDisponiveis).length);
+    });
 });
 
-// --- BUSCAR SALDO EM TEMPO REAL - SÓ DO USUÁRIO LOGADO ---
+// --- INPUT E SALDO ---
 const inputProduto = document.getElementById('id_produto');
 const alertaEstoque = document.getElementById('alertaEstoque');
 const saldoAtualSpan = document.getElementById('saldoAtual');
+const datalist = document.getElementById('listaProdutos');
 
-if (inputProduto) {
-    async function buscarSaldo() {
-        const user = auth.currentUser;
+if (inputProduto && datalist) {
+    // Atualiza datalist conforme digita
+    inputProduto.addEventListener('input', () => {
+        const valor = inputProduto.value.toUpperCase();
+        let html = "";
         
-        if (!user) {
-            console.log("⏳ Aguardando autenticação...");
-            saldoAtualSpan.innerText = "Carregando...";
-            return;
-        }
-        
-        const codigo = inputProduto.value.trim().toUpperCase();
-        if (!codigo) {
-            alertaEstoque.style.display = 'none';
-            return;
-        }
-        
-        console.log(`🔍 Buscando saldo de: ${codigo} para UID: ${user.uid}`);
-        
-        try {
-            const docRef = doc(db, "usuarios", user.uid, "produtos", codigo);
-            const docSnap = await getDoc(docRef);
-            
-            if (saldoAtualSpan) {
-                if (docSnap.exists()) {
-                    const saldo = docSnap.data().estoque_atual || 0;
-                    saldoAtualSpan.innerText = saldo;
-                    console.log(`✅ Produto encontrado: ${codigo} = ${saldo} unidades`);
-                } else {
-                    saldoAtualSpan.innerText = "0 (Novo)";
-                    console.log(`📝 Produto novo: ${codigo} será criado ao finalizar`);
-                }
-                alertaEstoque.style.display = 'block';
+        // Filtra produtos que contêm o valor digitado
+        Object.keys(produtosDisponiveis).forEach(codigo => {
+            if (codigo.includes(valor)) {
+                const saldo = produtosDisponiveis[codigo];
+                html += `<option value="${codigo}" label="${codigo} - Saldo: ${saldo}"></option>`;
             }
-        } catch (error) {
-            console.error("❌ Erro ao buscar saldo:", error);
-            saldoAtualSpan.innerText = "Erro";
-        }
+        });
+        
+        datalist.innerHTML = html;
+        console.log(`🔍 Filtrando: "${valor}" encontrou ${html.split('option').length - 2} resultados`);
+        
+        // Busca saldo em tempo real
+        buscarSaldo();
+    });
+}
+
+async function buscarSaldo() {
+    const user = auth.currentUser;
+    if (!user) {
+        console.log("⏳ Aguardando autenticação...");
+        return;
     }
     
-    // Aguarda um pouco antes de buscar (deixa o Firestore atualizar)
-    let timeoutBusca;
-    inputProduto.addEventListener('input', () => {
-        clearTimeout(timeoutBusca);
-        timeoutBusca = setTimeout(buscarSaldo, 300); // Espera 300ms depois de parar de digitar
-    });
+    const codigo = inputProduto.value.trim().toUpperCase();
+    if (!codigo) {
+        alertaEstoque.style.display = 'none';
+        return;
+    }
     
-    // Busca imediatamente ao sair do campo
-    inputProduto.addEventListener('blur', () => {
-        clearTimeout(timeoutBusca);
-        buscarSaldo();
-    });
+    console.log(`🔍 Buscando: ${codigo}`);
     
-    // Busca ao selecionar do autocomplete
-    inputProduto.addEventListener('change', () => {
-        clearTimeout(timeoutBusca);
-        buscarSaldo();
-    });
+    try {
+        const docRef = doc(db, "usuarios", user.uid, "produtos", codigo);
+        const docSnap = await getDoc(docRef);
+        
+        if (saldoAtualSpan && alertaEstoque) {
+            if (docSnap.exists()) {
+                const saldo = docSnap.data().estoque_atual || 0;
+                saldoAtualSpan.innerText = saldo;
+                console.log(`✅ ENCONTRADO: ${codigo} = ${saldo} unidades`);
+            } else {
+                saldoAtualSpan.innerText = "0 (Novo)";
+                console.log(`📝 NOVO: ${codigo} será criado ao lançar`);
+            }
+            alertaEstoque.style.display = 'block';
+        }
+    } catch (error) {
+        console.error("❌ ERRO ao buscar saldo:", error);
+        if (saldoAtualSpan) saldoAtualSpan.innerText = "Erro";
+    }
+}
+
+// Busca ao selecionar do datalist
+if (inputProduto) {
+    inputProduto.addEventListener('change', buscarSaldo);
+    inputProduto.addEventListener('blur', () => setTimeout(buscarSaldo, 100));
 }
 
 window.addEventListener('tipoAlterado', (e) => { operacaoAtual = e.detail; });
@@ -191,6 +199,8 @@ if (form) {
         const codigo = inputProduto.value.trim().toUpperCase();
         const quantidade = Number(document.getElementById('quantidade').value);
         const ref = document.getElementById('referencia')?.value.trim() || "SEM REF";
+
+        console.log(`📤 Lançando: ${codigo} | Qtd: ${quantidade} | Tipo: ${operacaoAtual}`);
 
         try {
             const produtoRef = doc(db, "usuarios", user.uid, "produtos", codigo);
@@ -214,11 +224,12 @@ if (form) {
 
             if (operacaoAtual === "SAIDA") await atualizarGiroEVerificarCritico(codigo);
 
+            console.log("✅ Lançamento gravado com sucesso!");
             alert("✅ Lançamento realizado!");
             form.reset();
             alertaEstoque.style.display = 'none';
         } catch (error) { 
-            console.error(error);
+            console.error("❌ ERRO ao gravar:", error);
             alert("Erro ao gravar."); 
         }
     };
