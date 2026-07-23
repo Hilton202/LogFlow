@@ -1,4 +1,5 @@
 import { db } from './db.js';
+import { getAuth } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-auth.js";
 import { 
     writeBatch, 
     doc, 
@@ -8,6 +9,7 @@ import {
     serverTimestamp 
 } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore.js";
 
+const auth = getAuth();
 const input = document.getElementById('arquivoExcel');
 const btnProcessar = document.getElementById('btnProcessar');
 const tabelaPrevia = document.getElementById('tabelaPrevia');
@@ -17,7 +19,7 @@ let dadosParaImportar = [];
 const termosCodigo = ['MATERIAS', 'MATERIA', 'CODIGO', 'PRODUTO', 'REF', 'ITEM', 'CÓDIGO'];
 const termosEstoque = ['ESTOQUE ATUAL', 'ESTOQUE', 'QTD', 'QUANTIDADE', 'SALDO', 'TOTAL', 'ATUAL'];
 
-// Função para limpar nomes de colunas (tira acento, espaço e deixa maiúsculo)
+// Função para limpar nomes de colunas
 const normalizar = (txt) => txt.toString().toUpperCase().trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s+/g, '');
 
 input.addEventListener('change', (e) => {
@@ -53,7 +55,7 @@ input.addEventListener('change', (e) => {
                 
                 // ATIVA O BOTÃO
                 btnProcessar.disabled = false;
-                btnProcessar.style.backgroundColor = "#16a34a"; // Verde
+                btnProcessar.style.backgroundColor = "#16a34a";
                 btnProcessar.style.cursor = "pointer";
             }
         } catch (err) {
@@ -75,6 +77,12 @@ function exibirPrevia(dados) {
 btnProcessar.onclick = async () => {
     if (dadosParaImportar.length === 0) return;
 
+    const user = auth.currentUser;
+    if (!user) {
+        alert("Você não está logado!");
+        return;
+    }
+
     btnProcessar.disabled = true;
     btnProcessar.innerText = "⏳ ENVIANDO EM LOTE...";
 
@@ -83,18 +91,19 @@ btnProcessar.onclick = async () => {
 
     try {
         for (const item of dadosParaImportar) {
-            const ref = doc(db, "produtos", item.id);
+            // ✅ USA SUB-COLEÇÃO DO USUÁRIO
+            const ref = doc(db, "usuarios", user.uid, "produtos", item.id);
             
-            // Atualiza o produto
             batch.set(ref, {
                 codigo: item.id,
                 estoque_atual: item.qtd,
                 ultima_atualizacao: serverTimestamp()
             }, { merge: true });
 
-            // Registra movimentação
-            const movRef = doc(collection(db, "movimentacoes"));
-            batch.set(movRef, {
+            // ✅ MOVIMENTAÇÃO TAMBÉM NA SUB-COLEÇÃO (FORMA CORRETA)
+            const movRef = collection(db, "usuarios", user.uid, "movimentacoes");
+            const novoDoc = doc(movRef);
+            batch.set(novoDoc, {
                 codigo: item.id,
                 quantidade: item.qtd,
                 tipo: "ENTRADA",
@@ -104,7 +113,6 @@ btnProcessar.onclick = async () => {
 
             contador++;
 
-            // Envia a cada 200 itens (400 operações) para não exceder limite do Firebase
             if (contador >= 200) {
                 await batch.commit();
                 batch = writeBatch(db); 
