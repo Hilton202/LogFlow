@@ -2,8 +2,7 @@ import { verificarAutenticacao } from './auth.js';
 verificarAutenticacao();
 
 import { initializeApp, getApps, getApp } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-app.js";
-import { getFirestore, collection, onSnapshot, query, where, orderBy } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore.js";
-// 1. Adicionado Auth para identificar o usuário logado
+import { getFirestore, collection, onSnapshot, query, where, orderBy, Timestamp } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore.js";
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-auth.js";
 
 const firebaseConfig = {
@@ -17,7 +16,7 @@ const firebaseConfig = {
 
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 const db = getFirestore(app);
-const auth = getAuth(app); // Inicializa o Auth
+const auth = getAuth(app);
 
 const mesesNomes = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
 let girosCalculados = {};
@@ -43,10 +42,13 @@ function calcularGirosDinâmicos(movimentacoes) {
         novosGiros[cod] = novosGiros[cod] / 30;
     });
     girosCalculados = novosGiros;
+    console.log("📊 Giros calculados:", girosCalculados);
 }
 
 // --- RENDERIZAR TABELA DE PRODUTOS ---
 function renderizarTudo(docs) {
+    console.log("🔄 Renderizando tabela com", docs.length, "produtos");
+    
     let htmlTabela = "";
     let criticos = 0;
     let volumeTotal = 0;
@@ -88,36 +90,13 @@ function renderizarTudo(docs) {
     if (corpoTabela) corpoTabela.innerHTML = htmlTabela;
     document.getElementById('itensCriticos').innerText = criticos;
     document.getElementById('totalPecas').innerText = volumeTotal;
+    console.log("✅ Tabela atualizada | Total:", volumeTotal, "| Críticos:", criticos);
 }
 
-// --- MONITORAMENTO EM TEMPO REAL FILTRADO POR USUÁRIO ---
-
-// IMPORTANTE: Só inicia os listeners quando o usuário for detectado
-onAuthStateChanged(auth, (user) => {
-    if (user) {
-        const uid = user.uid;
-        console.log("Dashboard carregando dados para:", uid);
-
-        // 1. Ouve apenas as movimentações do USUÁRIO logado
-        const movRef = collection(db, "usuarios", uid, "movimentacoes");
-        onSnapshot(movRef, (snapMov) => {
-            calcularGirosDinâmicos(snapMov.docs);
-            
-            // 2. Ouve apenas os produtos do USUÁRIO logado
-            const prodRef = collection(db, "usuarios", uid, "produtos");
-            onSnapshot(prodRef, (snapProd) => {
-                renderizarTudo(snapProd.docs);
-            });
-
-            renderizarHistoricoMensal(snapMov);
-        });
-    } else {
-        console.log("Nenhum usuário logado. Redirecionando...");
-        window.location.href = "login.html"; // Ajuste para sua página de login
-    }
-});
-
+// --- RENDERIZAR HISTÓRICO MENSAL ---
 function renderizarHistoricoMensal(snap) {
+    console.log("📅 Renderizando histórico com", snap.docs.length, "movimentações");
+    
     let dadosAgrupados = {};
     let totalMovMes = 0;
 
@@ -168,3 +147,41 @@ function renderizarHistoricoMensal(snap) {
     });
     document.getElementById('listaMovimentos').innerHTML = html;
 }
+
+// --- MONITORAMENTO EM TEMPO REAL FILTRADO POR USUÁRIO ---
+onAuthStateChanged(auth, (user) => {
+    if (user) {
+        const uid = user.uid;
+        console.log("✅ Dashboard carregando dados para:", uid);
+
+        // 1. Ouve as movimentações do usuário
+        const movRef = collection(db, "usuarios", uid, "movimentacoes");
+        const movListener = onSnapshot(movRef, (snapMov) => {
+            console.log("📥 Movimentações carregadas:", snapMov.docs.length);
+            calcularGirosDinâmicos(snapMov.docs);
+            renderizarHistoricoMensal(snapMov);
+            
+            // 2. Ouve os produtos DEPOIS de calcular giros
+            const prodRef = collection(db, "usuarios", uid, "produtos");
+            const prodListener = onSnapshot(prodRef, (snapProd) => {
+                console.log("📦 Produtos carregados:", snapProd.docs.length);
+                renderizarTudo(snapProd.docs);
+            });
+
+            // Retorna função de cleanup
+            return () => {
+                console.log("🛑 Desinstalando listener de produtos");
+                prodListener();
+            };
+        });
+
+        // Retorna função de cleanup do listener de movimentações
+        return () => {
+            console.log("🛑 Desinstalando listener de movimentações");
+            movListener();
+        };
+    } else {
+        console.log("❌ Nenhum usuário logado. Redirecionando...");
+        window.location.href = "login.html";
+    }
+});
