@@ -121,16 +121,29 @@ if (inputProduto) {
 
 window.addEventListener('tipoAlterado', (e) => { operacaoAtual = e.detail; });
 
+import { getAuth } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-auth.js";
+
+const auth = getAuth(app); // Adicione isto no topo
+
 const form = document.getElementById('formEstoque');
 if (form) {
     form.onsubmit = async (e) => {
         e.preventDefault();
+        
+        const user = auth.currentUser; // Pega o usuário logado
+        if (!user) {
+            alert("Você não está logado!");
+            return;
+        }
+
         const codigo = inputProduto.value.trim().toUpperCase();
         const quantidade = Number(document.getElementById('quantidade').value);
         const ref = document.getElementById('referencia')?.value.trim() || "SEM REF";
 
         try {
-            const produtoRef = doc(db, "produtos", codigo);
+            // ✅ Usa a sub-coleção do USUÁRIO LOGADO
+            const produtoRef = doc(db, "usuarios", user.uid, "produtos", codigo);
+            // ... resto do código
             const docSnap = await getDoc(produtoRef);
             const estoqueNoBanco = docSnap.exists() ? Number(docSnap.data().estoque_atual) : 0;
 
@@ -139,8 +152,8 @@ if (form) {
                 return;
             }
 
-            await addDoc(collection(db, "movimentacoes"), {
-                codigo, quantidade, tipo: operacaoAtual, referencia: ref, data: serverTimestamp()
+            await addDoc(collection(db, "usuarios", user.uid, "movimentacoes"), {
+            codigo, quantidade, tipo: operacaoAtual, referencia: ref, data: serverTimestamp()
             });
 
             await setDoc(produtoRef, {

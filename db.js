@@ -1,7 +1,6 @@
 import { initializeApp, getApps, getApp } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-app.js";
 import { 
-    initializeFirestore, 
-    persistentLocalCache, 
+    getFirestore, // Alterado para a inicialização padrão
     doc, 
     setDoc, 
     increment, 
@@ -9,8 +8,8 @@ import {
     addDoc, 
     serverTimestamp 
 } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore.js";
+import { getAuth } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-auth.js";
 
-// Configuração do Firebase
 const firebaseConfig = {
     apiKey: "AIzaSyBVu2nD3RJg5q-CH-oyxJvn-6agQw09rsA",
     authDomain: "sistema-de-estoque-8ff60.firebaseapp.com",
@@ -23,15 +22,22 @@ const firebaseConfig = {
 // 1. Inicializa o App
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 
-// 2. Inicializa o Firestore com o NOVO sistema de Cache (Sem avisos de depreciação)
-const db = initializeFirestore(app, {
-    localCache: persistentLocalCache()
-});
+// 2. Inicializa o Firestore SEM cache persistente
+// Ao usar getFirestore, ele utiliza as configurações padrão (cache em memória apenas)
+const db = getFirestore(app);
+const auth = getAuth(app);
 
 /**
- * Função para registrar entradas e saídas de produtos
+ * Função para registrar entradas e saídas de produtos no LogFlow
  */
 export async function registrarMovimentacao(codigo, qtd, ref, tipo) {
+    const user = auth.currentUser;
+
+    if (!user) {
+        console.error("Erro: Usuário não está logado!");
+        return false;
+    }
+
     if (!codigo || !qtd) {
         console.error("Dados incompletos: Código ou Quantidade ausente.");
         return false;
@@ -41,9 +47,12 @@ export async function registrarMovimentacao(codigo, qtd, ref, tipo) {
         const codigoLimpo = codigo.trim().toUpperCase();
         const quantidadeNumerica = Number(qtd);
         const tipoFormatado = tipo.toUpperCase();
+        const uid = user.uid;
 
-        // 1. Salva o histórico da movimentação
-        await addDoc(collection(db, "movimentacoes"), {
+        // 3. Salva na sub-coleção do usuário logado
+        const movRef = collection(db, "usuarios", uid, "movimentacoes");
+        
+        await addDoc(movRef, {
             codigo: codigoLimpo,
             quantidade: quantidadeNumerica,
             tipo: tipoFormatado,
@@ -51,8 +60,8 @@ export async function registrarMovimentacao(codigo, qtd, ref, tipo) {
             data: serverTimestamp()
         });
 
-        // 2. Atualiza o saldo real do produto
-        const produtoRef = doc(db, "produtos", codigoLimpo);
+        // 4. Atualiza o saldo na sub-coleção de produtos do usuário
+        const produtoRef = doc(db, "usuarios", uid, "produtos", codigoLimpo);
         
         await setDoc(produtoRef, {
             codigo: codigoLimpo,
@@ -60,13 +69,13 @@ export async function registrarMovimentacao(codigo, qtd, ref, tipo) {
             ultima_atualizacao: serverTimestamp()
         }, { merge: true });
 
-        console.log(`✅ Movimentação de ${tipoFormatado}: ${quantidadeNumerica} un no item ${codigoLimpo}`);
+        console.log(`✅ Sucesso! Dados gravados para o UID: ${uid}`);
         return true;
 
     } catch (error) {
-        console.error("Erro crítico no Firebase:", error);
+        console.error("Erro ao gravar no Firebase:", error);
         throw error;
     }
 }
 
-export { db };
+export { db, auth };

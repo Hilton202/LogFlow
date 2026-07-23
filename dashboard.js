@@ -2,7 +2,9 @@ import { verificarAutenticacao } from './auth.js';
 verificarAutenticacao();
 
 import { initializeApp, getApps, getApp } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-app.js";
-import { getFirestore, collection, onSnapshot, query, where, orderBy, enableIndexedDbPersistence } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore.js";
+import { getFirestore, collection, onSnapshot, query, where, orderBy } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore.js";
+// 1. Adicionado Auth para identificar o usuário logado
+import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-auth.js";
 
 const firebaseConfig = {
     apiKey: "AIzaSyBVu2nD3RJg5q-CH-oyxJvn-6agQw09rsA",
@@ -15,15 +17,9 @@ const firebaseConfig = {
 
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 const db = getFirestore(app);
-
-// ATIVA MODO OFFLINE (IMPORTANTE PARA A BIOS)
-enableIndexedDbPersistence(db).catch((err) => {
-    console.log("Persistência offline não ativa:", err.code);
-});
+const auth = getAuth(app); // Inicializa o Auth
 
 const mesesNomes = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
-
-// --- VARIÁVEL GLOBAL PARA ARMAZENAR GIRO CALCULADO ---
 let girosCalculados = {};
 
 // --- FUNÇÃO PARA CALCULAR GIRO (ÚLTIMOS 30 DIAS) ---
@@ -31,14 +27,11 @@ function calcularGirosDinâmicos(movimentacoes) {
     const agora = new Date();
     const trintaDiasAtras = new Date();
     trintaDiasAtras.setDate(agora.getDate() - 30);
-    
     let novosGiros = {};
 
     movimentacoes.forEach(doc => {
         const m = doc.data();
         const dataMov = m.data?.toDate() || new Date();
-        
-        // Só conta se for SAÍDA e estiver dentro dos últimos 30 dias
         if (m.tipo === "SAIDA" && dataMov >= trintaDiasAtras) {
             const cod = (m.codigo || "").trim();
             const qtd = Number(m.quantidade || 0);
@@ -46,11 +39,9 @@ function calcularGirosDinâmicos(movimentacoes) {
         }
     });
 
-    // Divide o total de cada produto por 30 para ter a média diária
     Object.keys(novosGiros).forEach(cod => {
         novosGiros[cod] = novosGiros[cod] / 30;
     });
-
     girosCalculados = novosGiros;
 }
 
@@ -65,8 +56,6 @@ function renderizarTudo(docs) {
         const p = docSnap.data();
         const cod = (p.codigo || docSnap.id).trim();
         const estoque = Number(p.estoque_atual) || 0;
-        
-        // TENTA PEGAR O GIRO CALCULADO AUTOMÁTICO, SE NÃO TIVER, USA O DO CADASTRO
         const mediaGiro = girosCalculados[cod] !== undefined ? girosCalculados[cod] : (Number(p.media_saida_diaria) || 0); 
         
         volumeTotal += estoque;
@@ -75,7 +64,6 @@ function renderizarTudo(docs) {
 
         if (mediaGiro > 0) {
             const totalDias = Math.round(estoque / mediaGiro);
-            // ALERTA: Se o estoque durar 20 dias ou menos
             if (totalDias <= 20) {
                 eCritico = true;
                 criticos++;
@@ -102,19 +90,31 @@ function renderizarTudo(docs) {
     document.getElementById('totalPecas').innerText = volumeTotal;
 }
 
-// --- MONITORAMENTO EM TEMPO REAL ---
+// --- MONITORAMENTO EM TEMPO REAL FILTRADO POR USUÁRIO ---
 
-// 1. Ouve as movimentações primeiro para calcular os giros
-onSnapshot(collection(db, "movimentacoes"), (snapMov) => {
-    calcularGirosDinâmicos(snapMov.docs);
-    
-    // 2. Depois de calcular os giros, busca os produtos para atualizar a tabela
-    onSnapshot(collection(db, "produtos"), (snapProd) => {
-        renderizarTudo(snapProd.docs);
-    });
+// IMPORTANTE: Só inicia os listeners quando o usuário for detectado
+onAuthStateChanged(auth, (user) => {
+    if (user) {
+        const uid = user.uid;
+        console.log("Dashboard carregando dados para:", uid);
 
-    // Atualiza a lista visual de histórico (seu código original de meses)
-    renderizarHistoricoMensal(snapMov);
+        // 1. Ouve apenas as movimentações do USUÁRIO logado
+        const movRef = collection(db, "usuarios", uid, "movimentacoes");
+        onSnapshot(movRef, (snapMov) => {
+            calcularGirosDinâmicos(snapMov.docs);
+            
+            // 2. Ouve apenas os produtos do USUÁRIO logado
+            const prodRef = collection(db, "usuarios", uid, "produtos");
+            onSnapshot(prodRef, (snapProd) => {
+                renderizarTudo(snapProd.docs);
+            });
+
+            renderizarHistoricoMensal(snapMov);
+        });
+    } else {
+        console.log("Nenhum usuário logado. Redirecionando...");
+        window.location.href = "login.html"; // Ajuste para sua página de login
+    }
 });
 
 function renderizarHistoricoMensal(snap) {
@@ -135,7 +135,7 @@ function renderizarHistoricoMensal(snap) {
     });
 
     document.getElementById('movimentacoesHoje').innerText = totalMovMes;
-    // ... (restante da lógica de gerar HTML do histórico permanece igual)
+    
     let html = "";
     Object.keys(dadosAgrupados).sort((a,b) => b-a).forEach(mesIdx => {
         const gerarLinhas = (d, cor) => {
@@ -168,7 +168,3 @@ function renderizarHistoricoMensal(snap) {
     });
     document.getElementById('listaMovimentos').innerHTML = html;
 }
-
-// Busca e Excel (Permanecem iguais)
-window.baixarExcel = function() { /* ... */ };
-document.getElementById('inputBusca').addEventListener('input', (e) => { /* ... */ });
