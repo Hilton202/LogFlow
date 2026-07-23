@@ -119,7 +119,12 @@ const saldoAtualSpan = document.getElementById('saldoAtual');
 if (inputProduto) {
     async function buscarSaldo() {
         const user = auth.currentUser;
-        if (!user) return;
+        
+        if (!user) {
+            console.log("⏳ Aguardando autenticação...");
+            saldoAtualSpan.innerText = "Carregando...";
+            return;
+        }
         
         const codigo = inputProduto.value.trim().toUpperCase();
         if (!codigo) {
@@ -127,19 +132,47 @@ if (inputProduto) {
             return;
         }
         
-        const docRef = doc(db, "usuarios", user.uid, "produtos", codigo);
-        const docSnap = await getDoc(docRef);
+        console.log(`🔍 Buscando saldo de: ${codigo} para UID: ${user.uid}`);
         
-        if (saldoAtualSpan) {
-            const saldo = docSnap.exists() ? docSnap.data().estoque_atual : 0;
-            const status = docSnap.exists() ? saldo : "(Novo)";
-            saldoAtualSpan.innerText = status;
-            alertaEstoque.style.display = 'block';
+        try {
+            const docRef = doc(db, "usuarios", user.uid, "produtos", codigo);
+            const docSnap = await getDoc(docRef);
+            
+            if (saldoAtualSpan) {
+                if (docSnap.exists()) {
+                    const saldo = docSnap.data().estoque_atual || 0;
+                    saldoAtualSpan.innerText = saldo;
+                    console.log(`✅ Produto encontrado: ${codigo} = ${saldo} unidades`);
+                } else {
+                    saldoAtualSpan.innerText = "0 (Novo)";
+                    console.log(`📝 Produto novo: ${codigo} será criado ao finalizar`);
+                }
+                alertaEstoque.style.display = 'block';
+            }
+        } catch (error) {
+            console.error("❌ Erro ao buscar saldo:", error);
+            saldoAtualSpan.innerText = "Erro";
         }
     }
     
-    inputProduto.addEventListener('input', buscarSaldo);
-    inputProduto.addEventListener('change', buscarSaldo);
+    // Aguarda um pouco antes de buscar (deixa o Firestore atualizar)
+    let timeoutBusca;
+    inputProduto.addEventListener('input', () => {
+        clearTimeout(timeoutBusca);
+        timeoutBusca = setTimeout(buscarSaldo, 300); // Espera 300ms depois de parar de digitar
+    });
+    
+    // Busca imediatamente ao sair do campo
+    inputProduto.addEventListener('blur', () => {
+        clearTimeout(timeoutBusca);
+        buscarSaldo();
+    });
+    
+    // Busca ao selecionar do autocomplete
+    inputProduto.addEventListener('change', () => {
+        clearTimeout(timeoutBusca);
+        buscarSaldo();
+    });
 }
 
 window.addEventListener('tipoAlterado', (e) => { operacaoAtual = e.detail; });
