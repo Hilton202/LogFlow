@@ -78,8 +78,11 @@ btnProcessar.onclick = async () => {
     if (dadosParaImportar.length === 0) return;
 
     const user = auth.currentUser;
+    console.log("❌ Usuário:", user);
+    console.log("❌ UID:", user?.uid);
+    
     if (!user) {
-        alert("Você não está logado!");
+        alert("Você não está logado! Faça login primeiro.");
         return;
     }
 
@@ -91,6 +94,8 @@ btnProcessar.onclick = async () => {
 
     try {
         for (const item of dadosParaImportar) {
+            console.log("Salvando:", item.id, "Qtd:", item.qtd);
+            
             // ✅ USA SUB-COLEÇÃO DO USUÁRIO
             const ref = doc(db, "usuarios", user.uid, "produtos", item.id);
             
@@ -114,6 +119,7 @@ btnProcessar.onclick = async () => {
             contador++;
 
             if (contador >= 200) {
+                console.log("Commitando 200 itens...");
                 await batch.commit();
                 batch = writeBatch(db); 
                 contador = 0;
@@ -121,15 +127,21 @@ btnProcessar.onclick = async () => {
         }
 
         if (contador > 0) {
+            console.log("Commitando últimos " + contador + " itens...");
             await batch.commit();
         }
 
+        console.log("✅ Importação concluída!");
         alert(`🚀 Sucesso! ${dadosParaImportar.length} itens importados.`);
-        window.location.href = 'dashboard.html';
+        setTimeout(() => {
+            window.location.href = 'dashboard.html';
+        }, 2000);
 
     } catch (error) {
-        console.error("Erro na importação:", error);
-        alert("Erro ao salvar no Firebase.");
+        console.error("❌ ERRO NA IMPORTAÇÃO:", error);
+        console.error("Código do erro:", error.code);
+        console.error("Mensagem:", error.message);
+        alert("Erro ao salvar no Firebase: " + error.message);
         btnProcessar.disabled = false;
         btnProcessar.innerText = "✅ TENTAR NOVAMENTE";
     }
