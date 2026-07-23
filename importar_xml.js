@@ -1,5 +1,6 @@
 import { initializeApp, getApps, getApp } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-app.js";
 import { getFirestore, doc, getDoc, setDoc, addDoc, collection, serverTimestamp, increment } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore.js";
+import { getAuth } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-auth.js";
 
 // 1. Configuração do Firebase
 const firebaseConfig = {
@@ -13,6 +14,7 @@ const firebaseConfig = {
 
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 const db = getFirestore(app);
+const auth = getAuth(app);
 
 let itensParaProcessar = [];
 
@@ -20,7 +22,6 @@ let itensParaProcessar = [];
 function iniciarLeitor() {
     const areaCamera = document.querySelector('#camera');
     
-    // Força a área da câmera a aparecer
     areaCamera.style.display = 'block';
 
     Quagga.init({
@@ -29,12 +30,10 @@ function iniciarLeitor() {
             type: "LiveStream",
             target: areaCamera,
             constraints: { 
-                // environment foca na câmera traseira do celular
                 facingMode: "environment" 
             }
         },
         decoder: {
-            // ean_reader é o padrão de mercado (caixas de remédio, alimentos, etc)
             readers: ["ean_reader", "code_128_reader", "ean_8_reader"] 
         }
     }, function(err) {
@@ -50,14 +49,18 @@ function iniciarLeitor() {
     Quagga.onDetected(async (data) => {
         const codigoBarras = data.codeResult.code;
         
-        // Para a câmera imediatamente após ler para não travar
         Quagga.stop();
-        areaCamera.style.display = 'none'; // Esconde a câmera após a leitura
+        areaCamera.style.display = 'none';
+
+        const user = auth.currentUser;
+        if (!user) {
+            alert("Você não está logado!");
+            return;
+        }
 
         alert("Código detectado: " + codigoBarras);
 
-        // Busca o produto no Firebase
-        const produtoRef = doc(db, "produtos", codigoBarras);
+        const produtoRef = doc(db, "usuarios", user.uid, "produtos", codigoBarras);
         try {
             const snap = await getDoc(produtoRef);
 
@@ -79,7 +82,7 @@ if(btnCamera) {
     btnCamera.onclick = iniciarLeitor;
 }
 
-// --- 2. Função para XML (Mantida com melhorias de seletor) ---
+// --- 2. Função para XML ---
 document.getElementById('btnProcessar').onclick = function() {
     const file = document.getElementById('xmlFile').files[0];
     if (!file) return alert("Selecione um arquivo XML!");
@@ -122,9 +125,16 @@ document.getElementById('btnProcessar').onclick = function() {
     reader.readAsText(file);
 };
 
-// --- 3. Função para Gravar no Firebase (Mantida) ---
+// --- 3. Função para Gravar no Firebase ---
 document.getElementById('btnConfirmarEntrada').onclick = async function() {
     const btn = document.getElementById('btnConfirmarEntrada');
+    
+    const user = auth.currentUser;
+    if (!user) {
+        alert("Você não está logado!");
+        return;
+    }
+    
     if (itensParaProcessar.length === 0) return;
     if (!confirm(`Confirmar entrada?`)) return;
 
@@ -133,7 +143,9 @@ document.getElementById('btnConfirmarEntrada').onclick = async function() {
 
     try {
         for (const item of itensParaProcessar) {
-            const produtoRef = doc(db, "produtos", item.codigo);
+            // ✅ USA SUB-COLEÇÃO DO USUÁRIO
+            const produtoRef = doc(db, "usuarios", user.uid, "produtos", item.codigo);
+            
             await setDoc(produtoRef, {
                 nome: item.nome,
                 estoque_atual: increment(item.qtd),
@@ -141,7 +153,8 @@ document.getElementById('btnConfirmarEntrada').onclick = async function() {
                 ultima_atualizacao: serverTimestamp()
             }, { merge: true });
 
-            await addDoc(collection(db, "movimentacoes"), {
+            // ✅ MOVIMENTAÇÃO NA SUB-COLEÇÃO
+            await addDoc(collection(db, "usuarios", user.uid, "movimentacoes"), {
                 codigo: item.codigo,
                 nome: item.nome,
                 quantidade: item.qtd,
