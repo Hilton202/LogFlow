@@ -2,7 +2,7 @@ import { verificarAutenticacao } from './auth.js';
 verificarAutenticacao();
 
 import { initializeApp, getApps, getApp } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-app.js";
-import { getFirestore, collection, onSnapshot, query, where, orderBy, Timestamp } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore.js";
+import { getFirestore, collection, onSnapshot } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore.js";
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-auth.js";
 
 const firebaseConfig = {
@@ -21,7 +21,6 @@ const auth = getAuth(app);
 const mesesNomes = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
 let girosCalculados = {};
 
-// --- FUNÇÃO PARA CALCULAR GIRO (ÚLTIMOS 30 DIAS) ---
 function calcularGirosDinâmicos(movimentacoes) {
     const agora = new Date();
     const trintaDiasAtras = new Date();
@@ -42,12 +41,10 @@ function calcularGirosDinâmicos(movimentacoes) {
         novosGiros[cod] = novosGiros[cod] / 30;
     });
     girosCalculados = novosGiros;
-    console.log("📊 Giros calculados:", girosCalculados);
 }
 
-// --- RENDERIZAR TABELA DE PRODUTOS ---
 function renderizarTudo(docs) {
-    console.log("🔄 Renderizando tabela com", docs.length, "produtos");
+    console.log("✅ RENDERIZANDO:", docs.length, "produtos");
     
     let htmlTabela = "";
     let criticos = 0;
@@ -87,16 +84,19 @@ function renderizarTudo(docs) {
             </tr>`;
     });
 
-    if (corpoTabela) corpoTabela.innerHTML = htmlTabela;
-    document.getElementById('itensCriticos').innerText = criticos;
-    document.getElementById('totalPecas').innerText = volumeTotal;
-    console.log("✅ Tabela atualizada | Total:", volumeTotal, "| Críticos:", criticos);
+    if (corpoTabela) {
+        corpoTabela.innerHTML = htmlTabela;
+        console.log("✅ Tabela atualizada com", docs.length, "produtos");
+    }
+    
+    const totalPecasEl = document.getElementById('totalPecas');
+    const itensCriticosEl = document.getElementById('itensCriticos');
+    
+    if (totalPecasEl) totalPecasEl.innerText = volumeTotal;
+    if (itensCriticosEl) itensCriticosEl.innerText = criticos;
 }
 
-// --- RENDERIZAR HISTÓRICO MENSAL ---
 function renderizarHistoricoMensal(snap) {
-    console.log("📅 Renderizando histórico com", snap.docs.length, "movimentações");
-    
     let dadosAgrupados = {};
     let totalMovMes = 0;
 
@@ -113,7 +113,8 @@ function renderizarHistoricoMensal(snap) {
         dadosAgrupados[mesIdx][tipo][cod] = (dadosAgrupados[mesIdx][tipo][cod] || 0) + qtd;
     });
 
-    document.getElementById('movimentacoesHoje').innerText = totalMovMes;
+    const movEl = document.getElementById('movimentacoesHoje');
+    if (movEl) movEl.innerText = totalMovMes;
     
     let html = "";
     Object.keys(dadosAgrupados).sort((a,b) => b-a).forEach(mesIdx => {
@@ -145,43 +146,37 @@ function renderizarHistoricoMensal(snap) {
                 </div>
             </div>`;
     });
-    document.getElementById('listaMovimentos').innerHTML = html;
+    
+    const listaMovEl = document.getElementById('listaMovimentos');
+    if (listaMovEl) listaMovEl.innerHTML = html;
 }
 
-// --- MONITORAMENTO EM TEMPO REAL FILTRADO POR USUÁRIO ---
+// MONITOR EM TEMPO REAL
 onAuthStateChanged(auth, (user) => {
     if (user) {
         const uid = user.uid;
-        console.log("✅ Dashboard carregando dados para:", uid);
+        console.log("✅ DASHBOARD INICIADO PARA:", uid);
 
-        // 1. Ouve as movimentações do usuário
-        const movRef = collection(db, "usuarios", uid, "movimentacoes");
-        const movListener = onSnapshot(movRef, (snapMov) => {
+        // Busca movimentações
+        console.log("📥 Conectando a movimentações...");
+        onSnapshot(collection(db, "usuarios", uid, "movimentacoes"), (snapMov) => {
             console.log("📥 Movimentações carregadas:", snapMov.docs.length);
             calcularGirosDinâmicos(snapMov.docs);
             renderizarHistoricoMensal(snapMov);
-            
-            // 2. Ouve os produtos DEPOIS de calcular giros
-            const prodRef = collection(db, "usuarios", uid, "produtos");
-            const prodListener = onSnapshot(prodRef, (snapProd) => {
-                console.log("📦 Produtos carregados:", snapProd.docs.length);
-                renderizarTudo(snapProd.docs);
-            });
-
-            // Retorna função de cleanup
-            return () => {
-                console.log("🛑 Desinstalando listener de produtos");
-                prodListener();
-            };
         });
 
-        // Retorna função de cleanup do listener de movimentações
-        return () => {
-            console.log("🛑 Desinstalando listener de movimentações");
-            movListener();
-        };
+        // Busca produtos
+        console.log("📦 Conectando a produtos...");
+        onSnapshot(collection(db, "usuarios", uid, "produtos"), (snapProd) => {
+            console.log("📦 Produtos carregados:", snapProd.docs.length);
+            if (snapProd.docs.length === 0) {
+                console.warn("⚠️ NENHUM PRODUTO ENCONTRADO! Verifique a importação.");
+            }
+            renderizarTudo(snapProd.docs);
+        });
+
     } else {
-        console.log("❌ Nenhum usuário logado. Redirecionando...");
+        console.log("❌ USUÁRIO NÃO LOGADO - REDIRECIONANDO");
         window.location.href = "login.html";
     }
 });
