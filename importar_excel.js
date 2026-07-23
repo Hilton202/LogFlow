@@ -4,7 +4,6 @@ import {
     writeBatch, 
     doc, 
     collection, 
-    setDoc, 
     serverTimestamp 
 } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore.js";
 
@@ -13,15 +12,12 @@ const input = document.getElementById('arquivoExcel');
 const btnProcessar = document.getElementById('btnProcessar');
 const tabelaPrevia = document.getElementById('tabelaPrevia');
 let dadosParaImportar = [];
-let usuarioAtual = null;
+let usuarioLogado = null;
 
-// ✅ MONITORA AUTENTICAÇÃO EM TEMPO REAL
+// MONITORA AUTENTICAÇÃO
 onAuthStateChanged(auth, (user) => {
-    usuarioAtual = user;
-    console.log("🔐 Status de autenticação:", user ? "LOGADO ✅" : "DESLOGADO ❌");
-    if (user) {
-        console.log("UID:", user.uid);
-    }
+    usuarioLogado = user;
+    console.log("🔐 AUTH ESTADO:", user ? `LOGADO (${user.uid})` : "DESLOGADO");
 });
 
 const termosCodigo = ['MATERIAS', 'MATERIA', 'CODIGO', 'PRODUTO', 'REF', 'ITEM', 'CÓDIGO'];
@@ -56,7 +52,7 @@ input.addEventListener('change', (e) => {
                     qtd: Number(item[colEstoque]) || 0
                 })).filter(item => item.id !== "");
 
-                console.log("📊 Dados parseados:", dadosParaImportar.length, "itens");
+                console.log("📊 Excel parseado:", dadosParaImportar.length, "itens");
                 exibirPrevia(dadosParaImportar);
                 
                 btnProcessar.disabled = false;
@@ -64,7 +60,7 @@ input.addEventListener('change', (e) => {
                 btnProcessar.style.cursor = "pointer";
             }
         } catch (err) {
-            console.error("❌ Erro na leitura do Excel:", err);
+            console.error("❌ ERRO na leitura Excel:", err);
             alert("Erro ao processar o arquivo Excel: " + err.message);
         }
     };
@@ -80,66 +76,66 @@ function exibirPrevia(dados) {
 }
 
 btnProcessar.onclick = async () => {
-    console.log("▶️ Iniciando importação...");
+    console.log("▶️ INICIANDO IMPORT...");
+    console.log("📍 Usuário logado?", usuarioLogado ? "SIM" : "NÃO");
     
+    if (!usuarioLogado) {
+        console.error("❌ ERRO CRÍTICO: Usuário não logado!");
+        alert("❌ VOCÊ NÃO ESTÁ LOGADO! Faça login primeiro!");
+        return;
+    }
+
+    const uid = usuarioLogado.uid;
+    console.log("✅ UID DO USUÁRIO:", uid);
+    console.log("📦 TOTAL DE ITENS:", dadosParaImportar.length);
+
     if (dadosParaImportar.length === 0) {
         alert("Nenhum dado para importar!");
         return;
     }
-
-    // ✅ VERIFICA SE ESTÁ LOGADO
-    if (!usuarioAtual) {
-        console.error("❌ ERRO: Usuário não está logado!");
-        alert("❌ ERRO: Você não está logado! Faça login primeiro.");
-        return;
-    }
-
-    const uid = usuarioAtual.uid;
-    console.log("✅ Usuário autenticado com UID:", uid);
-    console.log("📦 Importando", dadosParaImportar.length, "itens...");
 
     btnProcessar.disabled = true;
     btnProcessar.innerText = "⏳ ENVIANDO EM LOTE...";
 
     let batch = writeBatch(db);
     let contador = 0;
-    let erros = 0;
+    let itemsProcessados = 0;
 
     try {
         for (const item of dadosParaImportar) {
-            try {
-                console.log(`📝 Processando: ${item.id} (Qtd: ${item.qtd})`);
-                
-                // ✅ SALVA PRODUTO NA SUB-COLEÇÃO DO USUÁRIO
-                const produtoRef = doc(db, "usuarios", uid, "produtos", item.id);
-                batch.set(produtoRef, {
-                    codigo: item.id,
-                    estoque_atual: item.qtd,
-                    ultima_atualizacao: serverTimestamp()
-                }, { merge: true });
+            console.log(`📝 Processando: ${item.id} (Qtd: ${item.qtd})`);
+            
+            // CAMINHO CORRETO
+            const caminhoCompleto = `usuarios/${uid}/produtos/${item.id}`;
+            console.log(`📍 Caminho Firestore: ${caminhoCompleto}`);
+            
+            const produtoRef = doc(db, "usuarios", uid, "produtos", item.id);
+            
+            batch.set(produtoRef, {
+                codigo: item.id,
+                estoque_atual: item.qtd,
+                ultima_atualizacao: serverTimestamp()
+            }, { merge: true });
 
-                // ✅ SALVA MOVIMENTAÇÃO NA SUB-COLEÇÃO DO USUÁRIO
-                const movRef = collection(db, "usuarios", uid, "movimentacoes");
-                const novoDoc = doc(movRef);
-                batch.set(novoDoc, {
-                    codigo: item.id,
-                    quantidade: item.qtd,
-                    tipo: "ENTRADA",
-                    referencia: "MIGRAÇÃO_LOTE",
-                    data: serverTimestamp()
-                });
+            // MOVIMENTAÇÃO
+            const movRef = collection(db, "usuarios", uid, "movimentacoes");
+            const novoDoc = doc(movRef);
+            batch.set(novoDoc, {
+                codigo: item.id,
+                quantidade: item.qtd,
+                tipo: "ENTRADA",
+                referencia: "MIGRAÇÃO_LOTE",
+                data: serverTimestamp()
+            });
 
-                contador++;
+            contador++;
+            itemsProcessados++;
 
-                if (contador >= 200) {
-                    console.log(`💾 Commitando ${contador} itens (batch)...`);
-                    await batch.commit();
-                    batch = writeBatch(db);
-                    contador = 0;
-                }
-            } catch (itemError) {
-                console.error(`❌ Erro ao processar ${item.id}:`, itemError);
-                erros++;
+            if (contador >= 200) {
+                console.log(`💾 Commitando ${contador} itens...`);
+                await batch.commit();
+                batch = writeBatch(db); 
+                contador = 0;
             }
         }
 
@@ -148,24 +144,21 @@ btnProcessar.onclick = async () => {
             await batch.commit();
         }
 
-        const mensagem = erros > 0 
-            ? `⚠️ Importação concluída com ${erros} erros!\n✅ ${dadosParaImportar.length - erros} itens importados.`
-            : `🚀 Sucesso! ${dadosParaImportar.length} itens importados!`;
+        console.log("✅ IMPORT CONCLUÍDO!");
+        console.log("📊 Total processado:", itemsProcessados);
         
-        console.log("✅ Importação finalizada!");
-        alert(mensagem);
+        alert(`🚀 Sucesso! ${itemsProcessados} itens importados para:\n\nusuarios/${uid}/produtos`);
         
         setTimeout(() => {
             window.location.href = 'dashboard.html';
         }, 1500);
 
     } catch (error) {
-        console.error("❌ ERRO GERAL NA IMPORTAÇÃO:", error);
-        console.error("Tipo de erro:", error.name);
+        console.error("❌ ERRO GERAL:", error);
         console.error("Mensagem:", error.message);
         console.error("Stack:", error.stack);
         
-        alert("❌ Erro ao salvar no Firebase:\n" + error.message);
+        alert("❌ ERRO: " + error.message);
         btnProcessar.disabled = false;
         btnProcessar.innerText = "✅ TENTAR NOVAMENTE";
     }
