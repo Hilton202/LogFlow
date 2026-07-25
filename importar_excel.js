@@ -1,24 +1,37 @@
 import { db } from './db.js';
+import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-auth.js";
 import { 
     writeBatch, 
     doc, 
     collection, 
-    addDoc, 
-    setDoc, 
     serverTimestamp 
 } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore.js";
 
+const auth = getAuth();
 const input = document.getElementById('arquivoExcel');
 const btnProcessar = document.getElementById('btnProcessar');
 const tabelaPrevia = document.getElementById('tabelaPrevia');
 let dadosParaImportar = [];
+let usuarioLogado = null;
 
-// Dicionário inteligente (Sinônimos para as colunas)
+onAuthStateChanged(auth, (user) => {
+    usuarioLogado = user;
+    console.log("🔐 AUTH:", user ? `LOGADO (${user.uid})` : "DESLOGADO");
+});
+
 const termosCodigo = ['MATERIAS', 'MATERIA', 'CODIGO', 'PRODUTO', 'REF', 'ITEM', 'CÓDIGO'];
 const termosEstoque = ['ESTOQUE ATUAL', 'ESTOQUE', 'QTD', 'QUANTIDADE', 'SALDO', 'TOTAL', 'ATUAL'];
 
-// Função para limpar nomes de colunas (tira acento, espaço e deixa maiúsculo)
 const normalizar = (txt) => txt.toString().toUpperCase().trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s+/g, '');
+
+// FUNÇÃO PARA LIMPAR CÓDIGO (remove caracteres inválidos)
+function limparCodigo(codigo) {
+    return codigo
+        .replace(/\//g, "-")      // Barra / → hífen
+        .replace(/\\/g, "-")      // Barra invertida \ → hífen
+        .replace(/[:|*?"<>]/g, "-") // Outros caracteres inválidos → hífen
+        .trim();
+}
 
 input.addEventListener('change', (e) => {
     const file = e.target.files[0];
@@ -34,8 +47,6 @@ input.addEventListener('change', (e) => {
 
             if (jsonRaw.length > 0) {
                 const colunas = Object.keys(jsonRaw[0]);
-                
-                // Encontra as colunas dinamicamente
                 const colCodigo = colunas.find(c => termosCodigo.some(t => normalizar(t) === normalizar(c)));
                 const colEstoque = colunas.find(c => termosEstoque.some(t => normalizar(t) === normalizar(c)));
 
@@ -49,16 +60,16 @@ input.addEventListener('change', (e) => {
                     qtd: Number(item[colEstoque]) || 0
                 })).filter(item => item.id !== "");
 
+                console.log("📊 Excel parseado:", dadosParaImportar.length, "itens");
                 exibirPrevia(dadosParaImportar);
                 
-                // ATIVA O BOTÃO
                 btnProcessar.disabled = false;
-                btnProcessar.style.backgroundColor = "#16a34a"; // Verde
+                btnProcessar.style.backgroundColor = "#16a34a";
                 btnProcessar.style.cursor = "pointer";
             }
         } catch (err) {
-            console.error("Erro na leitura:", err);
-            alert("Erro ao processar o arquivo Excel.");
+            console.error("❌ ERRO na leitura Excel:", err);
+            alert("Erro ao processar o arquivo Excel: " + err.message);
         }
     };
     reader.readAsBinaryString(file);
@@ -73,29 +84,49 @@ function exibirPrevia(dados) {
 }
 
 btnProcessar.onclick = async () => {
-    if (dadosParaImportar.length === 0) return;
+    console.log("▶️ INICIANDO IMPORT...");
+    console.log("📍 Usuário logado?", usuarioLogado ? "SIM" : "NÃO");
+    
+    if (!usuarioLogado) {
+        console.error("❌ ERRO: Usuário não logado!");
+        alert("❌ VOCÊ NÃO ESTÁ LOGADO! Faça login primeiro!");
+        return;
+    }
+
+    const uid = usuarioLogado.uid;
+    console.log("✅ UID DO USUÁRIO:", uid);
+    console.log("📦 TOTAL DE ITENS:", dadosParaImportar.length);
+
+    if (dadosParaImportar.length === 0) {
+        alert("Nenhum dado para importar!");
+        return;
+    }
 
     btnProcessar.disabled = true;
     btnProcessar.innerText = "⏳ ENVIANDO EM LOTE...";
 
     let batch = writeBatch(db);
     let contador = 0;
+    let itemsProcessados = 0;
 
     try {
         for (const item of dadosParaImportar) {
-            const ref = doc(db, "produtos", item.id);
+            // LIMPA O CÓDIGO (remove caracteres inválidos)
+            const codigoLimpo = limparCodigo(item.id);
+            console.log(`📝 Processando: ${item.id} → ${codigoLimpo} (Qtd: ${item.qtd})`);
             
-            // Atualiza o produto
-            batch.set(ref, {
-                codigo: item.id,
+            const produtoRef = doc(db, "usuarios", uid, "produtos", codigoLimpo);
+            
+            batch.set(produtoRef, {
+                codigo: codigoLimpo,
                 estoque_atual: item.qtd,
                 ultima_atualizacao: serverTimestamp()
             }, { merge: true });
 
-            // Registra movimentação
-            const movRef = doc(collection(db, "movimentacoes"));
-            batch.set(movRef, {
-                codigo: item.id,
+            const movRef = collection(db, "usuarios", uid, "movimentacoes");
+            const novoDoc = doc(movRef);
+            batch.set(novoDoc, {
+                codigo: codigoLimpo,
                 quantidade: item.qtd,
                 tipo: "ENTRADA",
                 referencia: "MIGRAÇÃO_LOTE",
@@ -103,9 +134,10 @@ btnProcessar.onclick = async () => {
             });
 
             contador++;
+            itemsProcessados++;
 
-            // Envia a cada 200 itens (400 operações) para não exceder limite do Firebase
             if (contador >= 200) {
+                console.log(`💾 Commitando ${contador} itens...`);
                 await batch.commit();
                 batch = writeBatch(db); 
                 contador = 0;
@@ -113,15 +145,24 @@ btnProcessar.onclick = async () => {
         }
 
         if (contador > 0) {
+            console.log(`💾 Commitando últimos ${contador} itens...`);
             await batch.commit();
         }
 
-        alert(`🚀 Sucesso! ${dadosParaImportar.length} itens importados.`);
-        window.location.href = 'dashboard.html';
+        console.log("✅ IMPORT CONCLUÍDO!");
+        console.log("📊 Total processado:", itemsProcessados);
+        
+        alert(`🚀 Sucesso! ${itemsProcessados} itens importados!`);
+        
+        setTimeout(() => {
+            window.location.href = 'dashboard.html';
+        }, 1500);
 
     } catch (error) {
-        console.error("Erro na importação:", error);
-        alert("Erro ao salvar no Firebase.");
+        console.error("❌ ERRO GERAL:", error);
+        console.error("Mensagem:", error.message);
+        
+        alert("❌ ERRO: " + error.message);
         btnProcessar.disabled = false;
         btnProcessar.innerText = "✅ TENTAR NOVAMENTE";
     }

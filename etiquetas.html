@@ -3,39 +3,401 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="shortcut icon" href="img/logflow_logo.png" type="image/x-icon">
-    <title>Gerador de Etiquetas - Expedição Pro</title>
-    <link rel="stylesheet" href="style.css">
+    <title>LogFlow - Gerar Etiquetas com QR Code</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <style>
-        body { background: #f1f5f9; display: flex; justify-content: center; padding: 20px; }
-        .card-gerador { background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); width: 100%; max-width: 500px; text-align: center; }
-        .area-impressao { margin-top: 30px; padding: 20px; border: 2px dashed #cbd5e1; background: white; display: inline-block; }
-        .btn-print { background: #0f172a; color: white; margin-top: 20px; }
-        input { width: 100%; padding: 12px; margin: 10px 0; border: 1px solid #cbd5e1; border-radius: 8px; }
-        @media print { .no-print { display: none; } .area-impressao { border: none; margin: 0; } }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background: #f8fafc;
+            color: #1e293b;
+            transition: all 0.3s ease;
+        }
+
+        body.dark-mode {
+            background: #0f1419;
+            color: #e2e8f0;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: auto;
+            padding: 20px;
+        }
+
+        .navbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 15px 20px;
+            background: white;
+            border-bottom: 1px solid #e2e8f0;
+            margin-bottom: 20px;
+            border-radius: 8px;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        body.dark-mode .navbar {
+            background: #1a202c;
+            border-color: #334155;
+        }
+
+        .navbar-brand {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .navbar-brand img {
+            height: 40px;
+        }
+
+        .navbar-brand h1 {
+            color: #001F5B;
+            font-size: 1.5rem;
+        }
+
+        .navbar-actions {
+            display: flex;
+            gap: 10px;
+        }
+
+        .btn {
+            padding: 8px 15px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 13px;
+            transition: all 0.3s;
+        }
+
+        .btn-primary {
+            background: #001F5B;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #003a9e;
+        }
+
+        .btn-success {
+            background: #16a34a;
+            color: white;
+        }
+
+        .btn-success:hover {
+            background: #15803d;
+        }
+
+        .btn-toggle {
+            background: #f3f4f6;
+            color: #1e293b;
+            border: 1px solid #e2e8f0;
+        }
+
+        body.dark-mode .btn-toggle {
+            background: #334155;
+            color: #e2e8f0;
+        }
+
+        .content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .card {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+
+        body.dark-mode .card {
+            background: #1a202c;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .card h2 {
+            color: #001F5B;
+            margin-bottom: 15px;
+            font-size: 1.3rem;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: bold;
+            color: #1e293b;
+        }
+
+        body.dark-mode label {
+            color: #e2e8f0;
+        }
+
+        input[type="text"],
+        input[type="number"],
+        select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #e2e8f0;
+            border-radius: 5px;
+            font-size: 14px;
+            background: white;
+            color: #1e293b;
+        }
+
+        body.dark-mode input[type="text"],
+        body.dark-mode input[type="number"],
+        body.dark-mode select {
+            background: #334155;
+            border-color: #475569;
+            color: #e2e8f0;
+        }
+
+        input[type="text"]:focus,
+        input[type="number"]:focus,
+        select:focus {
+            outline: none;
+            border-color: #001F5B;
+            box-shadow: 0 0 0 3px rgba(0, 31, 91, 0.1);
+        }
+
+        .autocomplete-list {
+            position: absolute;
+            background: white;
+            border: 1px solid #e2e8f0;
+            border-top: none;
+            border-radius: 0 0 5px 5px;
+            max-height: 300px;
+            overflow-y: auto;
+            width: 100%;
+            z-index: 100;
+        }
+
+        body.dark-mode .autocomplete-list {
+            background: #334155;
+            border-color: #475569;
+        }
+
+        .autocomplete-item {
+            padding: 10px;
+            cursor: pointer;
+            border-bottom: 1px solid #e2e8f0;
+            transition: background 0.2s;
+        }
+
+        body.dark-mode .autocomplete-item {
+            border-color: #475569;
+        }
+
+        .autocomplete-item:hover {
+            background: #f1f5f9;
+        }
+
+        body.dark-mode .autocomplete-item:hover {
+            background: #475569;
+        }
+
+        .autocomplete-item strong {
+            color: #001F5B;
+            display: block;
+            margin-bottom: 3px;
+        }
+
+        body.dark-mode .autocomplete-item strong {
+            color: #00d4ff;
+        }
+
+        .autocomplete-item small {
+            color: #999;
+        }
+
+        .input-wrapper {
+            position: relative;
+        }
+
+        .preview-etiqueta {
+            border: 2px dashed #001F5B;
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+            min-height: 300px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+
+        body.dark-mode .preview-etiqueta {
+            border-color: #00d4ff;
+        }
+
+        .preview-etiqueta.vazio {
+            color: #999;
+        }
+
+        #qrcode {
+            margin: 15px 0;
+        }
+
+        .etiqueta-nome {
+            font-weight: bold;
+            font-size: 18px;
+            color: #001F5B;
+            margin-bottom: 10px;
+        }
+
+        body.dark-mode .etiqueta-nome {
+            color: #00d4ff;
+        }
+
+        .etiqueta-info {
+            font-size: 12px;
+            color: #666;
+            margin-top: 10px;
+        }
+
+        body.dark-mode .etiqueta-info {
+            color: #a0aec0;
+        }
+
+        .btn-imprimir {
+            width: 100%;
+            padding: 12px;
+            background: #16a34a;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-weight: bold;
+            cursor: pointer;
+            margin-top: 15px;
+            font-size: 16px;
+        }
+
+        .btn-imprimir:hover {
+            background: #15803d;
+        }
+
+        .btn-imprimir:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        @media (max-width: 768px) {
+            .content {
+                grid-template-columns: 1fr;
+            }
+
+            .navbar {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+        }
+
+        @media print {
+            body {
+                background: white;
+            }
+
+            .navbar,
+            .btn,
+            .card:first-child,
+            .btn-imprimir {
+                display: none !important;
+            }
+
+            .preview-etiqueta {
+                border: none;
+                page-break-after: always;
+                padding: 0;
+                min-height: auto;
+            }
+        }
+
+        .loading {
+            text-align: center;
+            color: #999;
+        }
     </style>
 </head>
 <body>
 
-<div class="card-gerador">
-    <div class="no-print">
-        <h1>🏷️ Gerador de QR Code</h1>
-        <p>Crie etiquetas para identificar seus produtos no estoque.</p>
-        
-        <input type="text" id="inputCodigo" placeholder="Digite o código do produto...">
-        <button class="btn-main" onclick="gerarQR()">GERAR ETIQUETA</button>
-        <button class="btn-main btn-print" onclick="window.print()">🖨️ IMPRIMIR</button>
-        <br><br>
-        <a href="index.html" style="text-decoration: none; color: #2563eb;">← Voltar ao Painel</a>
+<div class="container">
+    <div class="navbar">
+        <div class="navbar-brand">
+            <img src="img/logflow_logo.png" alt="LogFlow">
+            <h1>LogFlow</h1>
+        </div>
+        <div class="navbar-actions">
+            <button class="btn btn-primary" onclick="window.location.href='index.html'">📷 SCANNER</button>
+            <button class="btn btn-primary" onclick="window.location.href='dashboard.html'">📊 DASHBOARD</button>
+            <button class="btn btn-toggle" onclick="alternarTema()">🌙 Tema</button>
+        </div>
     </div>
 
-    <div id="etiquetaFinal" class="area-impressao">
-        <h2 id="labelCodigo" style="margin: 0 0 10px 0; font-family: monospace;">AGUARDANDO...</h2>
-        <div id="qrcode" style="display: flex; justify-content: center;"></div>
+    <div class="content">
+        <div class="card">
+            <h2>📋 Selecionar Produto</h2>
+
+            <div class="form-group">
+                <label for="inputProduto">🔍 Procurar Produto:</label>
+                <div class="input-wrapper">
+                    <input 
+                        type="text" 
+                        id="inputProduto" 
+                        placeholder="Digite o nome ou código do produto..."
+                        autocomplete="off"
+                    >
+                    <div id="autocompleteLista" class="autocomplete-list" style="display: none;"></div>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="quantidadeEtiquetas">📊 Quantidade de Etiquetas:</label>
+                <input type="number" id="quantidadeEtiquetas" value="1" min="1" max="100">
+            </div>
+
+            <div class="form-group">
+                <label for="tamanhoQR">📏 Tamanho do QR Code:</label>
+                <select id="tamanhoQR">
+                    <option value="100">Pequeno (100px)</option>
+                    <option value="150" selected>Médio (150px)</option>
+                    <option value="200">Grande (200px)</option>
+                    <option value="250">Extra Grande (250px)</option>
+                </select>
+            </div>
+
+            <div id="produtoSelecionado" style="display: none; margin-top: 20px; padding: 15px; background: #f1f5f9; border-radius: 5px;">
+                <p><strong>✅ Produto Selecionado:</strong></p>
+                <p id="produtoNome" style="font-size: 16px; color: #001F5B; margin-top: 5px;"></p>
+                <p id="produtoSaldo" style="font-size: 14px; color: #666; margin-top: 5px;"></p>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>🎫 Preview da Etiqueta</h2>
+            <div class="preview-etiqueta vazio" id="previewEtiqueta">
+                <p>Selecione um produto para ver a etiqueta</p>
+            </div>
+            <button class="btn-imprimir" id="btnImprimir" disabled onclick="imprimirEtiquetas()">🖨️ Imprimir Etiquetas</button>
+        </div>
     </div>
 </div>
-<script src="etiquetas.js"></script>
+
+<script type="module" src="etiquetas.js"></script>
 
 </body>
 </html>

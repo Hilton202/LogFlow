@@ -1,7 +1,7 @@
 import { initializeApp, getApps, getApp } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-app.js";
 import { getFirestore, doc, getDoc, setDoc, addDoc, collection, serverTimestamp, increment } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore.js";
+import { getAuth } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-auth.js";
 
-// 1. Configuração do Firebase
 const firebaseConfig = {
     apiKey: "AIzaSyBVu2nD3RJg5q-CH-oyxJvn-6agQw09rsA",
     authDomain: "sistema-de-estoque-8ff60.firebaseapp.com",
@@ -13,73 +13,19 @@ const firebaseConfig = {
 
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 const db = getFirestore(app);
+const auth = getAuth(app);
 
 let itensParaProcessar = [];
 
-// --- FUNÇÃO: LEITOR DE CÓDIGO DE BARRAS ATUALIZADA ---
-function iniciarLeitor() {
-    const areaCamera = document.querySelector('#camera');
-    
-    // Força a área da câmera a aparecer
-    areaCamera.style.display = 'block';
-
-    Quagga.init({
-        inputStream: {
-            name: "Live",
-            type: "LiveStream",
-            target: areaCamera,
-            constraints: { 
-                // environment foca na câmera traseira do celular
-                facingMode: "environment" 
-            }
-        },
-        decoder: {
-            // ean_reader é o padrão de mercado (caixas de remédio, alimentos, etc)
-            readers: ["ean_reader", "code_128_reader", "ean_8_reader"] 
-        }
-    }, function(err) {
-        if (err) {
-            console.error("Erro ao iniciar câmera:", err);
-            alert("Erro ao abrir a câmera. Verifique se você deu permissão no navegador e se está usando HTTPS ou Localhost.");
-            return;
-        }
-        console.log("Câmera iniciada com sucesso!");
-        Quagga.start();
-    });
-
-    Quagga.onDetected(async (data) => {
-        const codigoBarras = data.codeResult.code;
-        
-        // Para a câmera imediatamente após ler para não travar
-        Quagga.stop();
-        areaCamera.style.display = 'none'; // Esconde a câmera após a leitura
-
-        alert("Código detectado: " + codigoBarras);
-
-        // Busca o produto no Firebase
-        const produtoRef = doc(db, "produtos", codigoBarras);
-        try {
-            const snap = await getDoc(produtoRef);
-
-            if (snap.exists()) {
-                const prod = snap.data();
-                alert(`Produto Encontrado: ${prod.nome}\nEstoque: ${prod.estoque_atual}`);
-            } else {
-                alert("Produto não cadastrado! Use a função de Importar XML para cadastrá-lo pela primeira vez.");
-            }
-        } catch (error) {
-            console.error("Erro ao buscar no Firebase:", error);
-        }
-    });
+// LIMPAR CÓDIGO
+function limparCodigo(codigo) {
+    return codigo
+        .replace(/\//g, "-")
+        .replace(/\\/g, "-")
+        .replace(/[:|*?"<>]/g, "-")
+        .trim();
 }
 
-// Evento para o botão da câmera
-const btnCamera = document.getElementById('btnAbrirCamera');
-if(btnCamera) {
-    btnCamera.onclick = iniciarLeitor;
-}
-
-// --- 2. Função para XML (Mantida com melhorias de seletor) ---
 document.getElementById('btnProcessar').onclick = function() {
     const file = document.getElementById('xmlFile').files[0];
     if (!file) return alert("Selecione um arquivo XML!");
@@ -105,12 +51,14 @@ document.getElementById('btnProcessar').onclick = function() {
             const vUn = item.getElementsByTagNameNS("*", "vUnCom")[0]?.textContent || "0";
             const vTot = item.getElementsByTagNameNS("*", "vProd")[0]?.textContent || "0";
             const lote = item.getElementsByTagNameNS("*", "nLote")[0]?.textContent || "GERAL";
-            const validade = item.getElementsByTagNameNS("*", "dVal")[0]?.textContent || "";
 
             itensParaProcessar.push({
-                codigo, nome, qtd: Number(qtd), 
-                valorUnit: Number(vUn), valorTotal: Number(vTot),
-                lote, validade
+                codigo: limparCodigo(codigo),
+                nome, 
+                qtd: Number(qtd), 
+                valorUnit: Number(vUn), 
+                valorTotal: Number(vTot),
+                lote
             });
 
             html += `<tr><td><strong>${codigo}</strong></td><td>${nome}</td><td>${qtd}</td></tr>`;
@@ -122,9 +70,15 @@ document.getElementById('btnProcessar').onclick = function() {
     reader.readAsText(file);
 };
 
-// --- 3. Função para Gravar no Firebase (Mantida) ---
 document.getElementById('btnConfirmarEntrada').onclick = async function() {
     const btn = document.getElementById('btnConfirmarEntrada');
+    
+    const user = auth.currentUser;
+    if (!user) {
+        alert("Você não está logado!");
+        return;
+    }
+    
     if (itensParaProcessar.length === 0) return;
     if (!confirm(`Confirmar entrada?`)) return;
 
@@ -133,15 +87,17 @@ document.getElementById('btnConfirmarEntrada').onclick = async function() {
 
     try {
         for (const item of itensParaProcessar) {
-            const produtoRef = doc(db, "produtos", item.codigo);
+            const produtoRef = doc(db, "usuarios", user.uid, "produtos", item.codigo);
+            
             await setDoc(produtoRef, {
+                codigo: item.codigo,
                 nome: item.nome,
                 estoque_atual: increment(item.qtd),
                 preco_custo_ultimo: item.valorUnit,
                 ultima_atualizacao: serverTimestamp()
             }, { merge: true });
 
-            await addDoc(collection(db, "movimentacoes"), {
+            await addDoc(collection(db, "usuarios", user.uid, "movimentacoes"), {
                 codigo: item.codigo,
                 nome: item.nome,
                 quantidade: item.qtd,
@@ -156,7 +112,7 @@ document.getElementById('btnConfirmarEntrada').onclick = async function() {
         window.location.href = 'dashboard.html';
     } catch (error) {
         console.error(error);
-        alert("Erro ao salvar.");
+        alert("Erro ao salvar: " + error.message);
         btn.disabled = false;
     }
 };

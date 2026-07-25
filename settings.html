@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LogFlow - Configurações</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background: #f8fafc;
+            color: #1e293b;
+            transition: all 0.3s ease;
+        }
+
+        body.dark-mode {
+            background: #0f1419;
+            color: #e2e8f0;
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: auto;
+            padding: 20px;
+        }
+
+        .navbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 15px 20px;
+            background: white;
+            border-bottom: 1px solid #e2e8f0;
+            margin-bottom: 20px;
+            border-radius: 8px;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        body.dark-mode .navbar {
+            background: #1a202c;
+            border-color: #334155;
+        }
+
+        .navbar-brand {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .navbar-brand img {
+            height: 40px;
+        }
+
+        .navbar-brand h1 {
+            color: #001F5B;
+            font-size: 1.5rem;
+        }
+
+        .navbar-actions {
+            display: flex;
+            gap: 10px;
+        }
+
+        .btn {
+            padding: 8px 15px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 13px;
+            transition: all 0.3s;
+        }
+
+        .btn-primary {
+            background: #001F5B;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #003a9e;
+        }
+
+        .btn-toggle {
+            background: #f3f4f6;
+            color: #1e293b;
+            border: 1px solid #e2e8f0;
+        }
+
+        body.dark-mode .btn-toggle {
+            background: #334155;
+            color: #e2e8f0;
+        }
+
+        .card {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            margin-bottom: 20px;
+        }
+
+        body.dark-mode .card {
+            background: #1a202c;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .card h2 {
+            color: #001F5B;
+            margin-bottom: 20px;
+            font-size: 1.3rem;
+            border-bottom: 2px solid #001F5B;
+            padding-bottom: 10px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: bold;
+            color: #1e293b;
+        }
+
+        body.dark-mode label {
+            color: #e2e8f0;
+        }
+
+        input[type="text"],
+        input[type="email"],
+        textarea,
+        select {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #e2e8f0;
+            border-radius: 5px;
+            font-size: 14px;
+            background: white;
+            color: #1e293b;
+            font-family: inherit;
+        }
+
+        body.dark-mode input[type="text"],
+        body.dark-mode input[type="email"],
+        body.dark-mode textarea,
+        body.dark-mode select {
+            background: #334155;
+            border-color: #475569;
+            color: #e2e8f0;
+        }
+
+        input[type="text"]:focus,
+        input[type="email"]:focus,
+        textarea:focus,
+        select:focus {
+            outline: none;
+            border-color: #001F5B;
+            box-shadow: 0 0 0 3px rgba(0, 31, 91, 0.1);
+        }
+
+        .info-texto {
+            background: #f1f5f9;
+            padding: 12px;
+            border-left: 4px solid #001F5B;
+            border-radius: 5px;
+            margin-bottom: 15px;
+            font-size: 0.9rem;
+            line-height: 1.6;
+        }
+
+        body.dark-mode .info-texto {
+            background: #334155;
+            border-color: #00d4ff;
+            color: #e2e8f0;
+        }
+
+        .info-titulo {
+            font-weight: bold;
+            color: #001F5B;
+            margin-bottom: 8px;
+        }
+
+        body.dark-mode .info-titulo {
+            color: #00d4ff;
+        }
+
+        .botoes {
+            display: flex;
+            gap: 10px;
+            margin-top: 30px;
+            flex-wrap: wrap;
+        }
+
+        .btn-salvar {
+            flex: 1;
+            min-width: 150px;
+            padding: 12px;
+            background: #16a34a;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-weight: bold;
+            font-size: 16px;
+            cursor: pointer;
+        }
+
+        .btn-salvar:hover {
+            background: #15803d;
+        }
+
+        .btn-salvar:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        .btn-voltar {
+            flex: 1;
+            min-width: 150px;
+            padding: 12px;
+            background: #64748b;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-weight: bold;
+            font-size: 16px;
+            cursor: pointer;
+        }
+
+        .btn-voltar:hover {
+            background: #475569;
+        }
+
+        .mensagem {
+            padding: 12px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        .mensagem.sucesso {
+            background: #dcfce7;
+            border: 1px solid #22c55e;
+            color: #166534;
+            display: block;
+        }
+
+        .mensagem.erro {
+            background: #fee2e2;
+            border: 1px solid #ef4444;
+            color: #991b1b;
+            display: block;
+        }
+
+        body.dark-mode .mensagem.sucesso {
+            background: #064e3b;
+            color: #86efac;
+        }
+
+        body.dark-mode .mensagem.erro {
+            background: #7f1d1d;
+            color: #fca5a5;
+        }
+
+        .toggle-switch {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 50px;
+            height: 24px;
+        }
+
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            transition: .4s;
+            border-radius: 24px;
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 18px;
+            width: 18px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+
+        input:checked + .slider {
+            background-color: #16a34a;
+        }
+
+        input:checked + .slider:before {
+            transform: translateX(26px);
+        }
+
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #999;
+        }
+
+        @media (max-width: 768px) {
+            .navbar {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+
+            .botoes {
+                flex-direction: column;
+            }
+
+            .btn-salvar,
+            .btn-voltar {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="navbar">
+        <div class="navbar-brand">
+            <img src="img/logflow_logo.png" alt="LogFlow">
+            <h1>LogFlow</h1>
+        </div>
+        <div class="navbar-actions">
+            <button class="btn btn-primary" onclick="window.location.href='index.html'">📷 SCANNER</button>
+            <button class="btn btn-primary" onclick="window.location.href='dashboard.html'">📊 DASHBOARD</button>
+            <button class="btn btn-toggle" onclick="alternarTema()">🌙 Tema</button>
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>⚙️ Configurações de Notificações</h2>
+
+        <div id="mensagem" class="mensagem"></div>
+
+        <div class="toggle-switch">
+            <label style="margin: 0;">🔔 Ativar notificações via Telegram:</label>
+            <label class="switch">
+                <input type="checkbox" id="ativarNotificacoes" checked>
+                <span class="slider"></span>
+            </label>
+        </div>
+
+        <form id="formConfiguracao">
+            <div class="form-group">
+                <label for="telegramToken">🤖 Token do Bot Telegram:</label>
+                <div class="info-texto">
+                    <div class="info-titulo">Como obter seu Token:</div>
+                    1. Abra o Telegram e procure por <strong>@BotFather</strong><br>
+                    2. Envie o comando <strong>/start</strong><br>
+                    3. Envie <strong>/newbot</strong> e siga as instruções<br>
+                    4. Copie o token gerado (algo como: 123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11)<br>
+                    ⚠️ Mantenha este token em segurança!
+                </div>
+                <input type="text" id="telegramToken" placeholder="Ex: 123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11" required>
+            </div>
+
+            <div class="form-group">
+                <label for="telegramChatId">💬 Chat ID do Telegram:</label>
+                <div class="info-texto">
+                    <div class="info-titulo">Como obter seu Chat ID:</div>
+                    1. Envie uma mensagem qualquer para o seu bot<br>
+                    2. Acesse: <strong>https://api.telegram.org/bot{SEU_TOKEN}/getUpdates</strong><br>
+                    3. Procure por <strong>"id"</strong> dentro de <strong>"from"</strong><br>
+                    4. Copie este número (ex: 123456789)<br>
+                    ⚠️ Este ID identifica VOCÊ no Telegram!
+                </div>
+                <input type="text" id="telegramChatId" placeholder="Ex: 123456789" required>
+            </div>
+
+            <div class="form-group">
+                <label>📝 Teste de Conexão:</label>
+                <button type="button" class="btn btn-primary" onclick="testarConexao()" style="width: 100%; padding: 12px;">
+                    🧪 Enviar Mensagem de Teste
+                </button>
+            </div>
+
+            <div class="form-group">
+                <label style="display: flex; align-items: center; gap: 8px;">
+                    <input type="checkbox" id="alertasEstoqueCritico" checked style="width: auto;">
+                    🛒 Notificar quando estoque ficar CRÍTICO (≤20 dias)
+                </label>
+            </div>
+
+            <div class="form-group">
+                <label style="display: flex; align-items: center; gap: 8px;">
+                    <input type="checkbox" id="alertasEntrada" checked style="width: auto;">
+                    📥 Notificar todas as ENTRADAS
+                </label>
+            </div>
+
+            <div class="form-group">
+                <label style="display: flex; align-items: center; gap: 8px;">
+                    <input type="checkbox" id="alertasSaida" checked style="width: auto;">
+                    📤 Notificar todas as SAÍDAS
+                </label>
+            </div>
+
+            <div class="botoes">
+                <button type="submit" class="btn-salvar">💾 Salvar Configurações</button>
+                <button type="button" class="btn-voltar" onclick="window.history.back()">← Voltar</button>
+            </div>
+        </form>
+    </div>
+
+    <div class="card">
+        <h2>ℹ️ Informações Importantes</h2>
+        <div class="info-texto">
+            <div class="info-titulo">🔐 Privacidade e Segurança:</div>
+            • Seus dados de Telegram são salvos de forma <strong>criptografada</strong> no banco de dados<br>
+            • Somente VOCÊ tem acesso às suas configurações<br>
+            • O Token é necessário para enviar notificações (nunca é compartilhado)<br>
+            • Você pode alterar ou deletar suas configurações a qualquer momento
+        </div>
+        <div class="info-texto" style="margin-top: 15px;">
+            <div class="info-titulo">📱 Múltiplas Contas:</div>
+            • Se você tem múltiplas contas (pessoal + empresa), configure cada uma separadamente<br>
+            • Cada usuário recebe notificações apenas de sua própria conta<br>
+            • Ideal para manter dados separados e bem organizados
+        </div>
+    </div>
+</div>
+
+<script type="module" src="settings.js"></script>
+
+</body>
+</html>
