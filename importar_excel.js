@@ -14,24 +14,16 @@ const tabelaPrevia = document.getElementById('tabelaPrevia');
 let dadosParaImportar = [];
 let usuarioLogado = null;
 
+// MONITORA AUTENTICAÇÃO
 onAuthStateChanged(auth, (user) => {
     usuarioLogado = user;
-    console.log("🔐 AUTH:", user ? `LOGADO (${user.uid})` : "DESLOGADO");
+    console.log("🔐 AUTH ESTADO:", user ? `LOGADO (${user.uid})` : "DESLOGADO");
 });
 
 const termosCodigo = ['MATERIAS', 'MATERIA', 'CODIGO', 'PRODUTO', 'REF', 'ITEM', 'CÓDIGO'];
 const termosEstoque = ['ESTOQUE ATUAL', 'ESTOQUE', 'QTD', 'QUANTIDADE', 'SALDO', 'TOTAL', 'ATUAL'];
 
 const normalizar = (txt) => txt.toString().toUpperCase().trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s+/g, '');
-
-// FUNÇÃO PARA LIMPAR CÓDIGO (remove caracteres inválidos)
-function limparCodigo(codigo) {
-    return codigo
-        .replace(/\//g, "-")      // Barra / → hífen
-        .replace(/\\/g, "-")      // Barra invertida \ → hífen
-        .replace(/[:|*?"<>]/g, "-") // Outros caracteres inválidos → hífen
-        .trim();
-}
 
 input.addEventListener('change', (e) => {
     const file = e.target.files[0];
@@ -88,7 +80,7 @@ btnProcessar.onclick = async () => {
     console.log("📍 Usuário logado?", usuarioLogado ? "SIM" : "NÃO");
     
     if (!usuarioLogado) {
-        console.error("❌ ERRO: Usuário não logado!");
+        console.error("❌ ERRO CRÍTICO: Usuário não logado!");
         alert("❌ VOCÊ NÃO ESTÁ LOGADO! Faça login primeiro!");
         return;
     }
@@ -111,22 +103,25 @@ btnProcessar.onclick = async () => {
 
     try {
         for (const item of dadosParaImportar) {
-            // LIMPA O CÓDIGO (remove caracteres inválidos)
-            const codigoLimpo = limparCodigo(item.id);
-            console.log(`📝 Processando: ${item.id} → ${codigoLimpo} (Qtd: ${item.qtd})`);
+            console.log(`📝 Processando: ${item.id} (Qtd: ${item.qtd})`);
             
-            const produtoRef = doc(db, "usuarios", uid, "produtos", codigoLimpo);
+            // CAMINHO CORRETO
+            const caminhoCompleto = `usuarios/${uid}/produtos/${item.id}`;
+            console.log(`📍 Caminho Firestore: ${caminhoCompleto}`);
+            
+            const produtoRef = doc(db, "usuarios", uid, "produtos", item.id);
             
             batch.set(produtoRef, {
-                codigo: codigoLimpo,
+                codigo: item.id,
                 estoque_atual: item.qtd,
                 ultima_atualizacao: serverTimestamp()
             }, { merge: true });
 
+            // MOVIMENTAÇÃO
             const movRef = collection(db, "usuarios", uid, "movimentacoes");
             const novoDoc = doc(movRef);
             batch.set(novoDoc, {
-                codigo: codigoLimpo,
+                codigo: item.id,
                 quantidade: item.qtd,
                 tipo: "ENTRADA",
                 referencia: "MIGRAÇÃO_LOTE",
@@ -152,7 +147,7 @@ btnProcessar.onclick = async () => {
         console.log("✅ IMPORT CONCLUÍDO!");
         console.log("📊 Total processado:", itemsProcessados);
         
-        alert(`🚀 Sucesso! ${itemsProcessados} itens importados!`);
+        alert(`🚀 Sucesso! ${itemsProcessados} itens importados para:\n\nusuarios/${uid}/produtos`);
         
         setTimeout(() => {
             window.location.href = 'dashboard.html';
@@ -161,6 +156,7 @@ btnProcessar.onclick = async () => {
     } catch (error) {
         console.error("❌ ERRO GERAL:", error);
         console.error("Mensagem:", error.message);
+        console.error("Stack:", error.stack);
         
         alert("❌ ERRO: " + error.message);
         btnProcessar.disabled = false;

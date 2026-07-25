@@ -2,8 +2,7 @@ import { verificarAutenticacao } from './auth.js';
 import { initializeApp, getApps, getApp } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-app.js";
 import { 
     getFirestore, doc, setDoc, getDoc, addDoc, collection, 
-    serverTimestamp, increment, onSnapshot, query, where, getDocs, Timestamp,
-    writeBatch
+    serverTimestamp, increment, onSnapshot, query, where, getDocs, Timestamp 
 } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore.js";
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-auth.js";
 
@@ -22,87 +21,15 @@ const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 const db = getFirestore(app);
 const auth = getAuth(app);
 
-let telegramConfig = {
-    token: null,
-    chatId: null,
-    ativo: false,
-    alertasEstoqueCritico: true,
-    alertasEntrada: true,
-    alertasSaida: true
-};
+const TELEGRAM_TOKEN = "8571933477:AAGkfV-8JdctADeumjpyzHLkXAK-Sa9iNrE";
+const TELEGRAM_CHAT_ID = "7048438658";
 
 let operacaoAtual = "ENTRADA";
-let produtosDisponiveis = {};
-
-// ===== CARREGAR CONFIGURAÇÕES DE TELEGRAM DO USUÁRIO =====
-async function carregarConfigTelegram(uid) {
-    try {
-        const configRef = doc(db, "usuarios", uid, "configuracoes", "telegram");
-        const configSnap = await getDoc(configRef);
-
-        if (configSnap.exists()) {
-            telegramConfig = configSnap.data();
-            console.log("✅ Configurações de Telegram carregadas:", telegramConfig);
-        } else {
-            console.log("⚠️ Nenhuma configuração de Telegram encontrada - usando padrão");
-            telegramConfig = {
-                token: null,
-                chatId: null,
-                ativo: false,
-                alertasEstoqueCritico: true,
-                alertasEntrada: false,
-                alertasSaida: false
-            };
-        }
-    } catch (error) {
-        console.error("❌ Erro ao carregar config:", error);
-        telegramConfig = {
-            token: null,
-            chatId: null,
-            ativo: false,
-            alertasEstoqueCritico: true,
-            alertasEntrada: false,
-            alertasSaida: false
-        };
-    }
-    return telegramConfig;
-}
+let produtosDisponiveis = {}; // Armazena produtos em cache
 
 async function enviarNotificacaoTelegram(mensagem) {
-    console.log("📱 Verificando config Telegram:", {
-        ativo: telegramConfig.ativo,
-        temToken: !!telegramConfig.token,
-        temChatId: !!telegramConfig.chatId
-    });
-
-    if (!telegramConfig.ativo || !telegramConfig.token || !telegramConfig.chatId) {
-        console.log("⚠️ Telegram desativado ou não configurado");
-        return;
-    }
-
-    const url = `https://api.telegram.org/bot${telegramConfig.token}/sendMessage`;
-    console.log("📤 Enviando notificação Telegram...", mensagem);
-    
-    try {
-        const response = await fetch(url, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                chat_id: telegramConfig.chatId,
-                text: mensagem
-            })
-        });
-
-        const resultado = await response.json();
-        
-        if (resultado.ok) {
-            console.log("✅ Notificação Telegram enviada com sucesso!");
-        } else {
-            console.error("❌ Erro Telegram:", resultado);
-        }
-    } catch (e) {
-        console.error("❌ Erro ao enviar Telegram:", e);
-    }
+    const url = `https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage?chat_id=${TELEGRAM_CHAT_ID}&text=${encodeURIComponent(mensagem)}`;
+    try { await fetch(url); } catch (e) { console.error("Erro Telegram:", e); }
 }
 
 async function atualizarGiroEVerificarCritico(codigo) {
@@ -113,8 +40,6 @@ async function atualizarGiroEVerificarCritico(codigo) {
         const trintaDiasAtras = new Date();
         trintaDiasAtras.setDate(trintaDiasAtras.getDate() - 30);
 
-        // ⚡ OTIMIZAÇÃO: Fazer getDoc e getDocs em paralelo
-        const produtoRef = doc(db, "usuarios", user.uid, "produtos", codigo);
         const q = query(
             collection(db, "usuarios", user.uid, "movimentacoes"),
             where("codigo", "==", codigo),
@@ -122,44 +47,44 @@ async function atualizarGiroEVerificarCritico(codigo) {
             where("data", ">=", Timestamp.fromDate(trintaDiasAtras))
         );
 
-        const [docSnap, querySnapshot] = await Promise.all([
-            getDoc(produtoRef),
-            getDocs(q)
-        ]);
-
-        if (!docSnap.exists()) return;
-
-        const dados = docSnap.data();
-        const estoqueAtual = dados.estoque_atual || 0;
-        
+        const querySnapshot = await getDocs(q);
         let totalSaida = 0;
         querySnapshot.forEach((doc) => { totalSaida += Number(doc.data().quantidade); });
+
         const novaMedia = totalSaida / 30;
+        const produtoRef = doc(db, "usuarios", user.uid, "produtos", codigo);
+        const docSnap = await getDoc(produtoRef);
         
-        // ⚡ Atualizar giro
-        await setDoc(produtoRef, {
-            media_saida_diaria: novaMedia,
-            ultima_atualizacao_giro: serverTimestamp()
-        }, { merge: true });
-
-        if (novaMedia <= 0) return;
-
-        const coberturaDias = Math.round(estoqueAtual / novaMedia);
-        
-        if (coberturaDias <= 20 && telegramConfig.alertasEstoqueCritico) {
+        if (docSnap.exists()) {
+            const dados = docSnap.data();
+            const estoqueAtual = dados.estoque_atual || 0;
+            
             const ultimaNotificacao = dados.ultimo_alerta_telegram ? dados.ultimo_alerta_telegram.toDate() : null;
             const agora = new Date();
             const vinteQuatroHorasEmMs = 24 * 60 * 60 * 1000;
-            
-            if (!ultimaNotificacao || (agora.getTime() - ultimaNotificacao.getTime()) > vinteQuatroHorasEmMs) {
-                const alertaMsg = `⚠️ LOGFLOW ALERTA: O item ${codigo} está CRÍTICO!\n\n📦 Estoque: ${estoqueAtual}\n📉 Cobertura: ${coberturaDias} dias.`;
+
+            await setDoc(produtoRef, {
+                media_saida_diaria: novaMedia,
+                ultima_atualizacao_giro: serverTimestamp()
+            }, { merge: true });
+
+            if (novaMedia > 0) {
+                const coberturaDias = Math.round(estoqueAtual / novaMedia);
                 
-                Promise.all([
-                    enviarNotificacaoTelegram(alertaMsg),
-                    setDoc(produtoRef, { ultimo_alerta_telegram: serverTimestamp() }, { merge: true })
-                ]).catch(e => console.error("Erro alerta:", e));
-                
-                console.log("✅ Notificação enviada e travada por 24h.");
+                if (coberturaDias <= 20) {
+                    if (!ultimaNotificacao || (agora.getTime() - ultimaNotificacao.getTime()) > vinteQuatroHorasEmMs) {
+                        
+                        const alertaMsg = `⚠️ LOGFLOW ALERTA: O item ${codigo} está CRÍTICO!\n\n📦 Estoque: ${estoqueAtual}\n📉 Cobertura: ${coberturaDias} dias.`;
+                        
+                        await enviarNotificacaoTelegram(alertaMsg);
+
+                        await setDoc(produtoRef, {
+                            ultimo_alerta_telegram: serverTimestamp()
+                        }, { merge: true });
+                        
+                        console.log("✅ Notificação enviada e travada por 24h.");
+                    }
+                }
             }
         }
     } catch (e) {
@@ -167,8 +92,8 @@ async function atualizarGiroEVerificarCritico(codigo) {
     }
 }
 
-// MONITORA PRODUTOS EM TEMPO REAL
-onAuthStateChanged(auth, async (user) => {
+// --- AUTOCOMPLETE INTELIGENTE ---
+onAuthStateChanged(auth, (user) => {
     if (!user) {
         console.log("❌ Usuário não autenticado");
         return;
@@ -176,10 +101,7 @@ onAuthStateChanged(auth, async (user) => {
 
     console.log("✅ Monitorando produtos do usuário:", user.uid);
     
-    // ⚡ AGUARDAR o carregamento de configurações ANTES de continuar
-    await carregarConfigTelegram(user.uid);
-    console.log("✅ Config Telegram carregada:", telegramConfig);
-    
+    // Monitora produtos em tempo real
     onSnapshot(collection(db, "usuarios", user.uid, "produtos"), (snapshot) => {
         produtosDisponiveis = {};
         snapshot.forEach(doc => {
@@ -191,17 +113,19 @@ onAuthStateChanged(auth, async (user) => {
     });
 });
 
-// AUTOCOMPLETE INTELIGENTE
+// --- INPUT E SALDO ---
 const inputProduto = document.getElementById('id_produto');
 const alertaEstoque = document.getElementById('alertaEstoque');
 const saldoAtualSpan = document.getElementById('saldoAtual');
 const datalist = document.getElementById('listaProdutos');
 
 if (inputProduto && datalist) {
+    // Atualiza datalist conforme digita
     inputProduto.addEventListener('input', () => {
         const valor = inputProduto.value.toUpperCase();
         let html = "";
         
+        // Filtra produtos que contêm o valor digitado
         Object.keys(produtosDisponiveis).forEach(codigo => {
             if (codigo.includes(valor)) {
                 const saldo = produtosDisponiveis[codigo];
@@ -212,6 +136,7 @@ if (inputProduto && datalist) {
         datalist.innerHTML = html;
         console.log(`🔍 Filtrando: "${valor}" encontrou ${html.split('option').length - 2} resultados`);
         
+        // Busca saldo em tempo real
         buscarSaldo();
     });
 }
@@ -252,6 +177,7 @@ async function buscarSaldo() {
     }
 }
 
+// Busca ao selecionar do datalist
 if (inputProduto) {
     inputProduto.addEventListener('change', buscarSaldo);
     inputProduto.addEventListener('blur', () => setTimeout(buscarSaldo, 100));
@@ -276,28 +202,8 @@ if (form) {
 
         console.log(`📤 Lançando: ${codigo} | Qtd: ${quantidade} | Tipo: ${operacaoAtual}`);
 
-        // ✅ CONFIRMAÇÃO ANTES DE LANÇAR
-        const mensagemConfirmacao = `
-🔍 VERIFICAR DADOS:
-
-📦 Produto: ${codigo}
-📊 Quantidade: ${quantidade}
-📝 Tipo: ${operacaoAtual === 'ENTRADA' ? '📥 ENTRADA' : '📤 SAÍDA'}
-🏷️ Referência: ${ref}
-
-⚠️ CONFIRMA ESTES DADOS?
-        `;
-
-        if (!confirm(mensagemConfirmacao)) {
-            console.log("❌ Lançamento cancelado pelo usuário");
-            return;
-        }
-
         try {
             const produtoRef = doc(db, "usuarios", user.uid, "produtos", codigo);
-            const movColRef = collection(db, "usuarios", user.uid, "movimentacoes");
-            
-            // ⚡ OTIMIZAÇÃO 1: Validar estoque ANTES de tudo
             const docSnap = await getDoc(produtoRef);
             const estoqueNoBanco = docSnap.exists() ? Number(docSnap.data().estoque_atual) : 0;
 
@@ -306,62 +212,25 @@ if (form) {
                 return;
             }
 
-            // ⚡ OTIMIZAÇÃO 2: Usar writeBatch (2 writes paralelos = 1 única operação)
-            const batch = writeBatch(db);
-            
-            // Gravar movimento
-            const novaMovRef = doc(movColRef);
-            batch.set(novaMovRef, {
+            await addDoc(collection(db, "usuarios", user.uid, "movimentacoes"), {
                 codigo, quantidade, tipo: operacaoAtual, referencia: ref, data: serverTimestamp()
             });
-            
-            // ⚡ FIX: Usar SET com merge ao invés de UPDATE (funciona com produtos novos)
-            batch.set(produtoRef, {
+
+            await setDoc(produtoRef, {
                 codigo,
                 estoque_atual: increment(operacaoAtual === 'ENTRADA' ? quantidade : -quantidade),
                 ultima_atualizacao: serverTimestamp()
             }, { merge: true });
-            
-            // ⚡ OTIMIZAÇÃO 3: Executar batch (muito mais rápido que 2 operações sequenciais)
-            await batch.commit();
-            
+
+            if (operacaoAtual === "SAIDA") await atualizarGiroEVerificarCritico(codigo);
+
             console.log("✅ Lançamento gravado com sucesso!");
-            
-            // ⚡ OTIMIZAÇÃO 4: Atualizar giro em BACKGROUND (sem await)
-            if (operacaoAtual === "SAIDA") {
-                atualizarGiroEVerificarCritico(codigo).catch(e => console.error("Erro giro:", e));
-            }
-            
-            // ⚡ OTIMIZAÇÃO 5: Sucesso imediato (não espera o giro)
+            alert("✅ Lançamento realizado!");
             form.reset();
             alertaEstoque.style.display = 'none';
-            saldoAtualSpan.innerText = "";
-            inputProduto.focus();
-            
-            // 📱 ENVIAR NOTIFICAÇÃO DE ENTRADA/SAÍDA em background
-            console.log("🔔 Verificando notificações:", {
-                operacao: operacaoAtual,
-                alertasEntrada: telegramConfig.alertasEntrada,
-                alertasSaida: telegramConfig.alertasSaida
-            });
-
-            if (operacaoAtual === "ENTRADA" && telegramConfig.alertasEntrada) {
-                const msg = `📥 ENTRADA: ${codigo}\n📊 Quantidade: ${quantidade} unidades\n🏷️ Referência: ${ref}`;
-                console.log("📤 Enviando notificação de ENTRADA...");
-                enviarNotificacaoTelegram(msg).catch(e => console.error("Erro ao notificar entrada:", e));
-            } else if (operacaoAtual === "SAIDA" && telegramConfig.alertasSaida) {
-                const msg = `📤 SAÍDA: ${codigo}\n📊 Quantidade: ${quantidade} unidades\n🏷️ Referência: ${ref}`;
-                console.log("📤 Enviando notificação de SAÍDA...");
-                enviarNotificacaoTelegram(msg).catch(e => console.error("Erro ao notificar saída:", e));
-            } else {
-                console.log("⚠️ Notificação desabilitada ou config não carregada");
-            }
-            
-            alert("✅ Lançamento realizado com sucesso!");
-            
         } catch (error) { 
             console.error("❌ ERRO ao gravar:", error);
-            alert("❌ Erro ao gravar: " + error.message); 
+            alert("Erro ao gravar."); 
         }
     };
 }

@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LogFlow - Diagnóstico</title>
+    <style>
+        body {
+            font-family: monospace;
+            padding: 20px;
+            background: #1e293b;
+            color: #e2e8f0;
+        }
+        .container {
+            max-width: 800px;
+            margin: auto;
+        }
+        h1 {
+            color: #60a5fa;
+            text-align: center;
+        }
+        .info-box {
+            background: #0f172a;
+            border: 2px solid #60a5fa;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 8px;
+        }
+        .info-box h2 {
+            margin-top: 0;
+            color: #60a5fa;
+        }
+        .success {
+            border-color: #22c55e;
+            color: #86efac;
+        }
+        .error {
+            border-color: #ef4444;
+            color: #fca5a5;
+        }
+        .warning {
+            border-color: #f59e0b;
+            color: #fcd34d;
+        }
+        button {
+            background: #60a5fa;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            margin: 5px;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #3b82f6;
+        }
+        .output {
+            background: #0f172a;
+            border: 1px solid #475569;
+            padding: 10px;
+            border-radius: 5px;
+            max-height: 300px;
+            overflow-y: auto;
+            margin-top: 10px;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>🔧 DIAGNÓSTICO LOGFLOW</h1>
+
+    <div class="info-box">
+        <h2>📊 Status do Sistema</h2>
+        <div id="statusAuth">⏳ Verificando autenticação...</div>
+        <div id="statusDB">⏳ Verificando banco de dados...</div>
+        <div id="statusProdutos">⏳ Verificando produtos...</div>
+    </div>
+
+    <div class="info-box">
+        <h2>🛠️ Testes</h2>
+        <button onclick="testarAuth()">1️⃣ Testar Autenticação</button>
+        <button onclick="testarProdutos()">2️⃣ Listar Produtos</button>
+        <button onclick="testarMovimentacoes()">3️⃣ Listar Movimentações</button>
+        <button onclick="limparConsole()">🧹 Limpar Console</button>
+    </div>
+
+    <div class="info-box">
+        <h2>📋 Console</h2>
+        <div class="output" id="console">Aguardando testes...</div>
+    </div>
+</div>
+
+<script type="module">
+import { initializeApp, getApps, getApp } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-app.js";
+import { getFirestore, collection, getDocs, getDoc, doc } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore.js";
+import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-auth.js";
+
+const firebaseConfig = {
+    apiKey: "AIzaSyBVu2nD3RJg5q-CH-oyxJvn-6agQw09rsA",
+    authDomain: "sistema-de-estoque-8ff60.firebaseapp.com",
+    projectId: "sistema-de-estoque-8ff60",
+    storageBucket: "sistema-de-estoque-8ff60.firebasestorage.app",
+    messagingSenderId: "350798221431",
+    appId: "1:350798221431:web:ee97b59412b5aa0da2b672"
+};
+
+const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
+const db = getFirestore(app);
+const auth = getAuth(app);
+
+let usuarioAtual = null;
+const consoleEl = document.getElementById('console');
+
+function log(msg) {
+    const timestamp = new Date().toLocaleTimeString();
+    const linha = `[${timestamp}] ${msg}`;
+    console.log(linha);
+    consoleEl.innerHTML += linha + "\n";
+    consoleEl.scrollTop = consoleEl.scrollHeight;
+}
+
+function limparConsole() {
+    consoleEl.innerHTML = "";
+}
+
+// Monitora autenticação
+onAuthStateChanged(auth, (user) => {
+    usuarioAtual = user;
+    if (user) {
+        document.getElementById('statusAuth').innerHTML = `<span class="success">✅ LOGADO: ${user.email}</span>`;
+        log(`✅ Usuário logado: ${user.uid}`);
+    } else {
+        document.getElementById('statusAuth').innerHTML = `<span class="error">❌ NÃO LOGADO</span>`;
+        log(`❌ Usuário não autenticado`);
+    }
+});
+
+// Testa autenticação
+window.testarAuth = async function() {
+    log("━━━━━━━━ TESTE 1: AUTENTICAÇÃO ━━━━━━━━");
+    
+    if (!usuarioAtual) {
+        log("❌ ERRO: Usuário não logado!");
+        return;
+    }
+    
+    log(`✅ UID: ${usuarioAtual.uid}`);
+    log(`✅ Email: ${usuarioAtual.email}`);
+    log(`✅ Autenticado: SIM`);
+};
+
+// Testa produtos
+window.testarProdutos = async function() {
+    log("━━━━━━━━ TESTE 2: PRODUTOS ━━━━━━━━");
+    
+    if (!usuarioAtual) {
+        log("❌ ERRO: Faça login primeiro!");
+        return;
+    }
+
+    try {
+        const prodRef = collection(db, "usuarios", usuarioAtual.uid, "produtos");
+        const snapshot = await getDocs(prodRef);
+        
+        log(`📦 Total de produtos: ${snapshot.docs.length}`);
+        
+        if (snapshot.docs.length === 0) {
+            log("⚠️ NENHUM PRODUTO ENCONTRADO!");
+            return;
+        }
+
+        snapshot.docs.forEach(doc => {
+            const dados = doc.data();
+            log(`  • ${doc.id}: ${dados.estoque_atual || 0} unidades`);
+        });
+    } catch (e) {
+        log(`❌ ERRO: ${e.message}`);
+    }
+};
+
+// Testa movimentações
+window.testarMovimentacoes = async function() {
+    log("━━━━━━━━ TESTE 3: MOVIMENTAÇÕES ━━━━━━━━");
+    
+    if (!usuarioAtual) {
+        log("❌ ERRO: Faça login primeiro!");
+        return;
+    }
+
+    try {
+        const movRef = collection(db, "usuarios", usuarioAtual.uid, "movimentacoes");
+        const snapshot = await getDocs(movRef);
+        
+        log(`📥 Total de movimentações: ${snapshot.docs.length}`);
+        
+        if (snapshot.docs.length === 0) {
+            log("⚠️ NENHUMA MOVIMENTAÇÃO ENCONTRADA!");
+            return;
+        }
+
+        snapshot.docs.slice(0, 10).forEach(doc => {
+            const dados = doc.data();
+            const data = dados.data?.toDate?.() || new Date();
+            log(`  • ${dados.codigo}: ${dados.tipo} de ${dados.quantidade}un (${data.toLocaleDateString()})`);
+        });
+    } catch (e) {
+        log(`❌ ERRO: ${e.message}`);
+    }
+};
+
+log("🚀 Diagnóstico carregado!");
+</script>
+
+</body>
+</html>
