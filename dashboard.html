@@ -2,285 +2,356 @@
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <link rel="shortcut icon" href="img/logflow_logo.png" type="image/x-icon">
-    <title>Painel de Controle - LogFlow</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LogFlow - Dashboard</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <style>
-        :root {
-            --primary: #001F5B;
-            --success: #16a34a;
-            --danger: #dc2626;
-            --bg: #f8fafc;
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
         }
 
-        html, body { 
-            font-family: 'Segoe UI', system-ui, sans-serif; 
-            background: var(--bg); 
-            margin: 0; 
-            padding: 0; 
-            width: 100%;
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background: #f8fafc;
+            color: #1e293b;
+            padding: 20px;
+            transition: all 0.3s ease;
         }
 
-        .container { 
-            width: 100%; 
-            max-width: 1200px; 
-            margin: auto; 
-            padding: 10px;
-            box-sizing: border-box; 
+        body.dark-mode {
+            background: #0f1419;
+            color: #e2e8f0;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: auto;
         }
 
         .navbar {
             display: flex;
             align-items: center;
             justify-content: space-between;
-            padding: 10px 20px;
-            background: #fff;
-            border-bottom: 1px solid #e2e8f0;
-            margin-bottom: 15px;
-        }
-        
-        .brand { display: flex; align-items: center; }
-        .brand img { height: 50px; margin-right: 10px; }
-        .brand span { font-weight: bold; font-size: 1.4rem; color: var(--primary); }
-
-        .grid-resumo { 
-            display: grid; 
-            grid-template-columns: repeat(3, 1fr); 
-            gap: 8px; 
-            margin-bottom: 15px; 
-        }
-        
-        .card-stats { 
+            padding: 15px 20px;
             background: white;
-            padding: 15px 5px;
-            border-radius: 12px; 
-            text-align: center;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-        }
-        
-        .card-stats h2 { font-size: 1.5rem; margin: 5px 0; color: #1e293b; }
-        .card-stats small { font-size: 0.6rem; color: #64748b; font-weight: bold; text-transform: uppercase; }
-
-        .area-tabela { 
-            background: white; 
-            border-radius: 12px; 
-            padding: 15px; 
-            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            border-bottom: 1px solid #e2e8f0;
+            margin-bottom: 20px;
+            border-radius: 8px;
+            flex-wrap: wrap;
+            gap: 10px;
         }
 
-        .tabela-wrapper { width: 100%; overflow-x: auto; border-radius: 8px; }
-        table { width: 100%; border-collapse: collapse; }
-        th { padding: 12px; font-size: 0.75rem; background: #f8fafc; color: #64748b; text-align: left; text-transform: uppercase; }
-        td { padding: 12px; font-size: 0.85rem; border-bottom: 1px solid #f1f5f9; }
+        body.dark-mode .navbar {
+            background: #1a202c;
+            border-color: #334155;
+        }
 
-        .btn-main {
-            background: var(--primary);
-            color: white;
+        .navbar h1 {
+            color: #001F5B;
+            font-size: 1.5rem;
+        }
+
+        .navbar-actions {
+            display: flex;
+            gap: 10px;
+        }
+
+        .btn {
+            padding: 8px 15px;
             border: none;
-            padding: 12px 20px;
-            border-radius: 8px;
-            font-weight: bold;
+            border-radius: 5px;
             cursor: pointer;
-        }
-        
-        input#inputBusca {
-            width: 100%;
-            padding: 12px;
-            border-radius: 8px;
-            border: 1px solid #ddd;
-            margin-bottom: 15px;
-            box-sizing: border-box;
+            font-weight: bold;
+            font-size: 13px;
+            transition: all 0.3s;
         }
 
-        .loading {
-            text-align: center;
+        .btn-primary {
+            background: #001F5B;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #003a9e;
+        }
+
+        .btn-toggle {
+            background: #f3f4f6;
+            color: #1e293b;
+            border: 1px solid #e2e8f0;
+        }
+
+        body.dark-mode .btn-toggle {
+            background: #334155;
+            color: #e2e8f0;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .stat-card {
+            background: white;
             padding: 20px;
-            color: #64748b;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
         }
 
-        .error {
-            background: #fef2f2;
-            border: 1px solid #fca5a5;
-            color: #dc2626;
-            padding: 15px;
+        body.dark-mode .stat-card {
+            background: #1a202c;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .stat-card h3 {
+            color: #666;
+            font-size: 12px;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+        }
+
+        body.dark-mode .stat-card h3 {
+            color: #cbd5e1;
+        }
+
+        .stat-card .number {
+            font-size: 32px;
+            font-weight: bold;
+            color: #001F5B;
+        }
+
+        body.dark-mode .stat-card .number {
+            color: #00d4ff;
+        }
+
+        .charts-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .chart-card {
+            background: white;
+            padding: 20px;
             border-radius: 8px;
-            margin: 15px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+
+        body.dark-mode .chart-card {
+            background: #1a202c;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .chart-card h3 {
+            margin-bottom: 15px;
+            color: #001F5B;
+            border-bottom: 2px solid #001F5B;
+            padding-bottom: 10px;
+        }
+
+        body.dark-mode .chart-card h3 {
+            color: #00d4ff;
+            border-color: #00d4ff;
+        }
+
+        canvas {
+            max-height: 300px;
+        }
+
+        .actions {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .table-card {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+
+        body.dark-mode .table-card {
+            background: #1a202c;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 14px;
+        }
+
+        th {
+            background: #f1f5f9;
+            padding: 12px;
+            text-align: left;
+            font-weight: bold;
+            color: #001F5B;
+            border-bottom: 2px solid #e2e8f0;
+        }
+
+        body.dark-mode th {
+            background: #334155;
+            color: #00d4ff;
+            border-color: #475569;
+        }
+
+        td {
+            padding: 12px;
+            border-bottom: 1px solid #e2e8f0;
+        }
+
+        body.dark-mode td {
+            border-color: #334155;
+        }
+
+        tr:hover {
+            background: #f8fafc;
+        }
+
+        body.dark-mode tr:hover {
+            background: #334155;
+        }
+
+        .status-ok {
+            background: #dcfce7;
+            color: #166534;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-weight: bold;
+            font-size: 12px;
+        }
+
+        .status-critico {
+            background: #fee2e2;
+            color: #991b1b;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-weight: bold;
+            font-size: 12px;
+        }
+
+        @media (max-width: 768px) {
+            .navbar {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+
+            .charts-container {
+                grid-template-columns: 1fr;
+            }
+
+            .actions {
+                flex-direction: column;
+            }
+
+            .btn {
+                width: 100%;
+            }
         }
     </style>
 </head>
 <body>
 
-<div class="navbar">
-    <div class="brand">
-        <img src="img/logflow_logo.png" alt="LogFlow">
-        <span>LogFlow</span>
-    </div>
-    <button class="btn-main" onclick="window.location.href='index.html'">📷 SCANNER</button>
-</div>
-
 <div class="container">
-    <div class="grid-resumo">
-        <div class="card-stats" style="border-bottom: 4px solid var(--primary);">
-            <small>VOLUME TOTAL</small>
-            <h2 id="totalPecas">0</h2>
-        </div>
-        <div class="card-stats" style="border-bottom: 4px solid var(--danger);">
-            <small>ITENS CRÍTICOS</small>
-            <h2 id="itensCriticos">0</h2>
-        </div>
-        <div class="card-stats" style="border-bottom: 4px solid var(--success);">
-            <small>MOV. MÊS</small>
-            <h2 id="movimentacoesHoje">0</h2>
+    <div class="navbar">
+        <h1>📊 LogFlow - Dashboard</h1>
+        <div class="navbar-actions">
+            <button class="btn btn-primary" onclick="window.location.href='index.html'">📷 SCANNER</button>
+            <button class="btn btn-primary" onclick="window.location.href='audit-logs.html'">📝 AUDITORIA</button>
+            <button class="btn btn-toggle" onclick="alternarTema()">🌙 Tema</button>
         </div>
     </div>
 
-    <div class="area-tabela">
-        <input type="text" id="inputBusca" placeholder="🔍 Pesquisar produto ou código...">
-        <div class="tabela-wrapper">
-            <table id="tabelaEstoque">
-                <thead>
-                    <tr>
-                        <th>Produto</th>
-                        <th>Saldo</th>
-                        <th>Giro (30d)</th>
-                        <th>Cobertura</th>
-                        <th>Status</th>
-                    </tr>
-                </thead>
-                <tbody id="corpoTabela">
-                    <tr><td colspan="5" class="loading" id="loadingMsg">⏳ Carregando produtos...</td></tr>
-                </tbody>
-            </table>
+    <!-- NÚMEROS PRINCIPAIS -->
+    <div class="stats">
+        <div class="stat-card">
+            <h3>📦 Volume Total</h3>
+            <div class="number" id="volumeTotal">0</div>
         </div>
+        <div class="stat-card">
+            <h3>🛒 Itens Críticos</h3>
+            <div class="number" id="itensCriticos">0</div>
+        </div>
+        <div class="stat-card">
+            <h3>📊 Movimentações</h3>
+            <div class="number" id="movimentacoes">0</div>
+        </div>
+        <div class="stat-card">
+            <h3>📦 Produtos Cadastrados</h3>
+            <div class="number" id="produtosCadastrados">0</div>
+        </div>
+    </div>
+
+    <!-- AÇÕES -->
+    <div class="actions">
+        <button class="btn btn-primary" onclick="gerarPDF()">📄 Exportar PDF</button>
+        <button class="btn btn-primary" onclick="fazerBackup()">💾 Fazer Backup</button>
+    </div>
+
+    <!-- GRÁFICOS -->
+    <div class="charts-container">
+        <div class="chart-card">
+            <h3>📊 Entrada vs Saída</h3>
+            <canvas id="graficoEntradaSaida"></canvas>
+        </div>
+        
+        <div class="chart-card">
+            <h3>🥧 Proporção</h3>
+            <canvas id="graficoPizza"></canvas>
+        </div>
+    </div>
+
+    <div class="chart-card" style="margin-bottom: 20px;">
+        <h3>📈 Evolução do Estoque</h3>
+        <canvas id="graficoLinha"></canvas>
+    </div>
+
+    <!-- TABELA DE PRODUTOS -->
+    <div class="table-card">
+        <h3 style="margin-bottom: 15px; color: #001F5B; border-bottom: 2px solid #001F5B; padding-bottom: 10px;">📋 Produtos em Estoque</h3>
+        <input type="text" id="pesquisa" placeholder="🔍 Pesquisar produto ou código..." 
+               style="width: 100%; padding: 10px; margin-bottom: 15px; border: 1px solid #e2e8f0; border-radius: 5px;">
+        
+        <table id="tabelaProdutos">
+            <thead>
+                <tr>
+                    <th>Produto</th>
+                    <th>Saldo</th>
+                    <th>Giro (30D)</th>
+                    <th>Cobertura</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td colspan="5" style="text-align: center; color: #999;">Carregando produtos...</td>
+                </tr>
+            </tbody>
+        </table>
     </div>
 </div>
 
-<script type="module">
-import { verificarAutenticacao } from './auth.js';
-verificarAutenticacao();
+<script type="module" src="dashboard.js"></script>
 
-import { initializeApp, getApps, getApp } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-app.js";
-import { getFirestore, collection, onSnapshot } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore.js";
-import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-auth.js";
-
-const firebaseConfig = {
-    apiKey: "AIzaSyBVu2nD3RJg5q-CH-oyxJvn-6agQw09rsA",
-    authDomain: "sistema-de-estoque-8ff60.firebaseapp.com",
-    projectId: "sistema-de-estoque-8ff60",
-    storageBucket: "sistema-de-estoque-8ff60.firebasestorage.app",
-    messagingSenderId: "350798221431",
-    appId: "1:350798221431:web:ee97b59412b5aa0da2b672"
-};
-
-const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
-const db = getFirestore(app);
-const auth = getAuth(app);
-
-let girosCalculados = {};
-
-// MONITORA AUTENTICAÇÃO
-onAuthStateChanged(auth, (user) => {
-    if (user) {
-        console.log("✅ DASHBOARD - Usuário logado:", user.uid);
-        carregarDados(user.uid);
-    } else {
-        console.log("❌ DASHBOARD - Usuário não logado!");
-        document.getElementById('corpoTabela').innerHTML = '<tr><td colspan="5" class="error">❌ Faça login primeiro!</td></tr>';
-    }
-});
-
-function carregarDados(uid) {
-    console.log("📦 DASHBOARD - Buscando produtos do usuário:", uid);
-    
-    // Busca movimentações pra calcular giro
-    onSnapshot(collection(db, "usuarios", uid, "movimentacoes"), (snapMov) => {
-        console.log("📥 Movimentações encontradas:", snapMov.docs.length);
-        calcularGiros(snapMov.docs);
-    });
-
-    // Busca produtos
-    onSnapshot(collection(db, "usuarios", uid, "produtos"), (snapProd) => {
-        console.log("📦 Produtos encontrados:", snapProd.docs.length);
-        
-        if (snapProd.docs.length === 0) {
-            document.getElementById('corpoTabela').innerHTML = '<tr><td colspan="5" class="loading">⚠️ Nenhum produto cadastrado ainda</td></tr>';
-            return;
-        }
-
-        renderizarProdutos(snapProd.docs);
-    });
+<script>
+// Tema escuro
+function alternarTema() {
+    document.documentElement.style.colorScheme = document.body.classList.toggle('dark-mode') ? 'dark' : 'light';
+    localStorage.setItem('tema', document.body.classList.contains('dark-mode') ? 'dark' : 'light');
 }
 
-function calcularGiros(movimentacoes) {
-    const agora = new Date();
-    const trintaDiasAtras = new Date();
-    trintaDiasAtras.setDate(agora.getDate() - 30);
-    
-    girosCalculados = {};
-
-    movimentacoes.forEach(doc => {
-        const m = doc.data();
-        const dataMov = m.data?.toDate() || new Date();
-        
-        if (m.tipo === "SAIDA" && dataMov >= trintaDiasAtras) {
-            const cod = (m.codigo || "").trim();
-            const qtd = Number(m.quantidade || 0);
-            girosCalculados[cod] = (girosCalculados[cod] || 0) + qtd;
-        }
-    });
-
-    // Divide por 30 dias
-    Object.keys(girosCalculados).forEach(cod => {
-        girosCalculados[cod] = girosCalculados[cod] / 30;
-    });
-
-    console.log("📊 Giros calculados:", girosCalculados);
-}
-
-function renderizarProdutos(docs) {
-    let htmlTabela = "";
-    let criticos = 0;
-    let volumeTotal = 0;
-
-    docs.forEach(docSnap => {
-        const p = docSnap.data();
-        const cod = (p.codigo || docSnap.id).trim();
-        const estoque = Number(p.estoque_atual) || 0;
-        const mediaGiro = girosCalculados[cod] !== undefined ? girosCalculados[cod] : 0;
-        
-        volumeTotal += estoque;
-        let eCritico = false;
-        let textoCobertura = "Sem Saídas";
-
-        if (mediaGiro > 0) {
-            const totalDias = Math.round(estoque / mediaGiro);
-            if (totalDias <= 20) {
-                eCritico = true;
-                criticos++;
-            }
-            textoCobertura = `${totalDias} dias`;
-        }
-
-        htmlTabela += `
-            <tr>
-                <td><strong>${cod}</strong></td>
-                <td style="color: ${eCritico ? '#dc2626' : 'inherit'}; font-weight: bold;">${estoque}</td>
-                <td>${mediaGiro.toFixed(2)}</td>
-                <td>${textoCobertura}</td>
-                <td>
-                    <span style="padding: 4px 8px; border-radius: 6px; background: ${eCritico ? '#fee2e2' : '#f1f5f9'}; color: ${eCritico ? '#dc2626' : '#64748b'}; font-size: 0.7rem; font-weight:bold;">
-                        ${eCritico ? '🛒 COMPRAR' : '✅ OK'}
-                    </span>
-                </td>
-            </tr>`;
-    });
-
-    document.getElementById('corpoTabela').innerHTML = htmlTabela;
-    document.getElementById('totalPecas').innerText = volumeTotal;
-    document.getElementById('itensCriticos').innerText = criticos;
-    document.getElementById('movimentacoesHoje').innerText = docs.length;
-
-    console.log("✅ Dashboard atualizado | Produtos:", docs.length, "| Total:", volumeTotal);
+if (localStorage.getItem('tema') === 'dark') {
+    document.body.classList.add('dark-mode');
+    document.documentElement.style.colorScheme = 'dark';
 }
 </script>
 

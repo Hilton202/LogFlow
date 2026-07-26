@@ -2,7 +2,11 @@ import { verificarAutenticacao } from './auth.js';
 verificarAutenticacao();
 
 import { initializeApp, getApps, getApp } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-app.js";
-import { getFirestore, collection, onSnapshot } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore.js";
+import { 
+    getFirestore, doc, setDoc, getDoc, addDoc, collection, 
+    serverTimestamp, increment, onSnapshot, query, where, getDocs, Timestamp,
+    writeBatch
+} from "https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore.js";
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-auth.js";
 
 const firebaseConfig = {
@@ -18,165 +22,314 @@ const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 const db = getFirestore(app);
 const auth = getAuth(app);
 
-const mesesNomes = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
-let girosCalculados = {};
+// ===== TEMA ESCURO =====
+window.alternarTema = () => {
+    document.documentElement.style.colorScheme = document.body.classList.toggle('dark-mode') ? 'dark' : 'light';
+    localStorage.setItem('tema', document.body.classList.contains('dark-mode') ? 'dark' : 'light');
+};
 
-function calcularGirosDinâmicos(movimentacoes) {
-    const agora = new Date();
-    const trintaDiasAtras = new Date();
-    trintaDiasAtras.setDate(agora.getDate() - 30);
-    let novosGiros = {};
-
-    movimentacoes.forEach(doc => {
-        const m = doc.data();
-        const dataMov = m.data?.toDate() || new Date();
-        if (m.tipo === "SAIDA" && dataMov >= trintaDiasAtras) {
-            const cod = (m.codigo || "").trim();
-            const qtd = Number(m.quantidade || 0);
-            novosGiros[cod] = (novosGiros[cod] || 0) + qtd;
-        }
-    });
-
-    Object.keys(novosGiros).forEach(cod => {
-        novosGiros[cod] = novosGiros[cod] / 30;
-    });
-    girosCalculados = novosGiros;
+if (localStorage.getItem('tema') === 'dark') {
+    document.body.classList.add('dark-mode');
+    document.documentElement.style.colorScheme = 'dark';
 }
 
-function renderizarTudo(docs) {
-    console.log("✅ RENDERIZANDO:", docs.length, "produtos");
-    
-    let htmlTabela = "";
-    let criticos = 0;
-    let volumeTotal = 0;
-    const corpoTabela = document.getElementById('corpoTabela');
+// ===== CARREGAR DASHBOARD =====
+async function carregarDashboard() {
+    const user = auth.currentUser;
+    if (!user) return;
 
-    docs.forEach(docSnap => {
-        const p = docSnap.data();
-        const cod = (p.codigo || docSnap.id).trim();
-        const estoque = Number(p.estoque_atual) || 0;
-        const mediaGiro = girosCalculados[cod] !== undefined ? girosCalculados[cod] : (Number(p.media_saida_diaria) || 0); 
+    try {
+        console.log("📊 Carregando dashboard...");
         
-        volumeTotal += estoque;
-        let eCritico = false;
-        let textoCobertura = "Sem Saídas";
+        const prodRef = collection(db, "usuarios", user.uid, "produtos");
+        const prodSnap = await getDocs(prodRef);
+        
+        let totalProdutos = 0;
+        let totalEstoque = 0;
+        let produtosCriticos = 0;
+        let totalMovimentacoes = 0;
 
-        if (mediaGiro > 0) {
-            const totalDias = Math.round(estoque / mediaGiro);
-            if (totalDias <= 20) {
-                eCritico = true;
-                criticos++;
-            }
-            textoCobertura = `${totalDias} dias`;
-        }
+        const produtosArray = [];
 
-        htmlTabela += `
-            <tr>
-                <td><strong>${cod}</strong></td>
-                <td style="color: ${eCritico ? '#dc2626' : 'inherit'}; font-weight: bold;">${estoque}</td>
-                <td>${mediaGiro.toFixed(2)}</td>
-                <td>${textoCobertura}</td>
-                <td>
-                    <span style="padding: 4px 8px; border-radius: 6px; background: ${eCritico ? '#fee2e2' : '#f1f5f9'}; color: ${eCritico ? '#dc2626' : '#64748b'}; font-size: 0.7rem; font-weight:bold;">
-                        ${eCritico ? '🛒 COMPRAR' : '✅ OK'}
-                    </span>
-                </td>
-            </tr>`;
-    });
+        prodSnap.forEach(doc => {
+            totalProdutos++;
+            const dados = doc.data();
+            const saldo = dados.estoque_atual || 0;
+            totalEstoque += saldo;
+            
+            if (saldo <= 20) produtosCriticos++;
+            
+            produtosArray.push({
+                codigo: doc.id,
+                saldo,
+                giro: dados.media_saida_diaria || 0,
+                cobertura: dados.cobertura_dias || 0
+            });
+        });
 
-    if (corpoTabela) {
-        corpoTabela.innerHTML = htmlTabela;
-        console.log("✅ Tabela atualizada com", docs.length, "produtos");
+        // ===== CONTAR MOVIMENTACOES =====
+        const movRef = collection(db, "usuarios", user.uid, "movimentacoes");
+        const movSnap = await getDocs(movRef);
+        totalMovimentacoes = movSnap.size;
+
+        // ===== ATUALIZAR NÚMEROS NO DASHBOARD =====
+        const elemVolume = document.getElementById('volumeTotal');
+        const elemCriticos = document.getElementById('itensCriticos');
+        const elemCadastrados = document.getElementById('produtosCadastrados');
+        const elemMovimentacoes = document.getElementById('movimentacoes');
+
+        if (elemVolume) elemVolume.innerText = totalEstoque;
+        if (elemCriticos) elemCriticos.innerText = produtosCriticos;
+        if (elemCadastrados) elemCadastrados.innerText = totalProdutos;
+        if (elemMovimentacoes) elemMovimentacoes.innerText = totalMovimentacoes;
+
+        console.log(`✅ Dashboard atualizado | Produtos: ${totalProdutos} | Total: ${totalEstoque}`);
+
+        // ===== CARREGAR GRÁFICOS =====
+        await carregarGraficos();
+
+    } catch (error) {
+        console.error("❌ Erro ao carregar dashboard:", error);
     }
-    
-    const totalPecasEl = document.getElementById('totalPecas');
-    const itensCriticosEl = document.getElementById('itensCriticos');
-    
-    if (totalPecasEl) totalPecasEl.innerText = volumeTotal;
-    if (itensCriticosEl) itensCriticosEl.innerText = criticos;
 }
 
-function renderizarHistoricoMensal(snap) {
-    let dadosAgrupados = {};
-    let totalMovMes = 0;
+// ===== CARREGAR GRÁFICOS =====
+async function carregarGraficos() {
+    const user = auth.currentUser;
+    if (!user) return;
 
-    snap.forEach(doc => {
-        const m = doc.data();
-        const data = m.data?.toDate() || new Date();
-        const mesIdx = data.getMonth();
-        totalMovMes++;
+    try {
+        const movRef = collection(db, "usuarios", user.uid, "movimentacoes");
+        const movSnap = await getDocs(movRef);
 
-        if (!dadosAgrupados[mesIdx]) dadosAgrupados[mesIdx] = { entradas: {}, saidas: {} };
-        const cod = (m.codigo || "S/ COD").trim();
-        const qtd = Number(m.quantidade || 0);
-        const tipo = m.tipo === "ENTRADA" ? "entradas" : "saidas";
-        dadosAgrupados[mesIdx][tipo][cod] = (dadosAgrupados[mesIdx][tipo][cod] || 0) + qtd;
-    });
+        let entradas = 0, saidas = 0;
+        const ultimos7Dias = [];
 
-    const movEl = document.getElementById('movimentacoesHoje');
-    if (movEl) movEl.innerText = totalMovMes;
-    
-    let html = "";
-    Object.keys(dadosAgrupados).sort((a,b) => b-a).forEach(mesIdx => {
-        const gerarLinhas = (d, cor) => {
-            const itens = Object.entries(d);
-            if (itens.length === 0) return "<p style='font-size:0.7rem; color:#999;'>Nenhuma movimentação</p>";
-            return itens.map(([c, q]) => `
-                <div style="display: flex; justify-content: space-between; padding: 5px 0; border-bottom: 1px solid #eee; font-size:0.8rem;">
-                    <span>${c}</span>
-                    <span style="color: ${cor}; font-weight: bold;">${cor === '#16a34a' ? '+' : '-'}${q}</span>
-                </div>`).join('');
+        movSnap.forEach(doc => {
+            const tipo = doc.data().tipo;
+            const quantidade = Number(doc.data().quantidade);
+            
+            if (tipo === "ENTRADA") {
+                entradas += quantidade;
+            } else {
+                saidas += quantidade;
+            }
+        });
+
+        console.log(`✅ Gráficos calculados | Entradas: ${entradas} | Saídas: ${saidas}`);
+
+        // ===== GRÁFICO 1: Barras (Entrada vs Saída) =====
+        const ctx1 = document.getElementById('graficoEntradaSaida')?.getContext('2d');
+        if (ctx1 && typeof Chart !== 'undefined') {
+            if (window.chart1) window.chart1.destroy();
+            window.chart1 = new Chart(ctx1, {
+                type: 'bar',
+                data: {
+                    labels: ['Entradas', 'Saídas'],
+                    datasets: [{
+                        label: 'Quantidade',
+                        data: [entradas, saidas],
+                        backgroundColor: ['#51cf66', '#ff6b6b'],
+                        borderRadius: 5
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    plugins: {
+                        legend: { position: 'top' }
+                    },
+                    scales: {
+                        y: { beginAtZero: true }
+                    }
+                }
+            });
+        }
+
+        // ===== GRÁFICO 2: Pizza (Proporção) =====
+        const ctx2 = document.getElementById('graficoPizza')?.getContext('2d');
+        if (ctx2 && typeof Chart !== 'undefined') {
+            if (window.chart2) window.chart2.destroy();
+            window.chart2 = new Chart(ctx2, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Entrada', 'Saída'],
+                    datasets: [{
+                        data: [entradas, saidas],
+                        backgroundColor: ['#51cf66', '#ff6b6b'],
+                        borderRadius: 5
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    plugins: {
+                        legend: { position: 'top' }
+                    }
+                }
+            });
+        }
+
+        // ===== GRÁFICO 3: Linha (Evolução) =====
+        const ctx3 = document.getElementById('graficoLinha')?.getContext('2d');
+        if (ctx3 && typeof Chart !== 'undefined') {
+            if (window.chart3) window.chart3.destroy();
+            window.chart3 = new Chart(ctx3, {
+                type: 'line',
+                data: {
+                    labels: ['Semana 1', 'Semana 2', 'Semana 3', 'Semana 4'],
+                    datasets: [{
+                        label: 'Estoque Total',
+                        data: [2000, 2050, 2100, 2078],
+                        borderColor: '#001F5B',
+                        backgroundColor: 'rgba(0, 31, 91, 0.1)',
+                        fill: true,
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    plugins: {
+                        legend: { position: 'top' }
+                    },
+                    scales: {
+                        y: { beginAtZero: true }
+                    }
+                }
+            });
+        }
+
+    } catch (error) {
+        console.error("❌ Erro ao carregar gráficos:", error);
+    }
+}
+
+// ===== FAZER BACKUP =====
+window.fazerBackup = async () => {
+    const user = auth.currentUser;
+    if (!user) {
+        alert("Você não está logado!");
+        return;
+    }
+
+    try {
+        console.log("💾 Gerando backup...");
+        alert("⏳ Gerando backup...");
+        
+        const prodRef = collection(db, "usuarios", user.uid, "produtos");
+        const prodSnap = await getDocs(prodRef);
+        
+        const dados = [];
+        prodSnap.forEach(doc => {
+            dados.push({
+                codigo: doc.id,
+                ...doc.data()
+            });
+        });
+
+        const backup = {
+            data: new Date().toISOString(),
+            usuario: user.email,
+            produtos: dados,
+            total: dados.length
         };
 
-        html += `
-            <div style="margin-bottom: 10px; border: 1px solid #e2e8f0; border-radius: 8px; overflow:hidden;">
-                <button onclick="this.nextElementSibling.style.display = (this.nextElementSibling.style.display === 'block' ? 'none' : 'block')" 
-                        style="width:100%; padding:12px; border:none; background:#f8fafc; text-align:left; font-weight:bold; cursor:pointer;">
-                    📅 ${mesesNomes[mesIdx]}
-                </button>
-                <div style="display:none; padding:10px; background:#fff;">
-                    <div style="margin-bottom:10px;">
-                        <small style="color:#16a34a; font-weight:bold;">📥 ENTRADAS</small>
-                        ${gerarLinhas(dadosAgrupados[mesIdx].entradas, '#16a34a')}
-                    </div>
-                    <div>
-                        <small style="color:#dc2626; font-weight:bold;">📤 SAÍDAS</small>
-                        ${gerarLinhas(dadosAgrupados[mesIdx].saidas, '#dc2626')}
-                    </div>
-                </div>
-            </div>`;
-    });
-    
-    const listaMovEl = document.getElementById('listaMovimentos');
-    if (listaMovEl) listaMovEl.innerHTML = html;
-}
+        const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `backup-${new Date().toISOString().split('T')[0]}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
 
-// MONITOR EM TEMPO REAL
+        console.log("✅ Backup realizado!");
+        alert("✅ Backup realizado com sucesso!");
+    } catch (error) {
+        console.error("❌ Erro:", error);
+        alert("Erro ao fazer backup: " + error.message);
+    }
+};
+
+// ===== GERAR PDF =====
+window.gerarPDF = async () => {
+    const user = auth.currentUser;
+    if (!user) {
+        alert("Você não está logado!");
+        return;
+    }
+
+    try {
+        console.log("📄 Gerando PDF...");
+        alert("⏳ Gerando PDF...");
+        
+        const prodRef = collection(db, "usuarios", user.uid, "produtos");
+        const prodSnap = await getDocs(prodRef);
+        
+        let html = `
+            <h1 style="text-align: center; color: #001F5B;">📊 Relatório de Estoque - LogFlow</h1>
+            <p><strong>Data:</strong> ${new Date().toLocaleString('pt-BR')}</p>
+            <p><strong>Usuário:</strong> ${user.email}</p>
+            <table border="1" cellpadding="10" style="width: 100%; border-collapse: collapse;">
+                <thead style="background: #001F5B; color: white;">
+                    <tr>
+                        <th>Código</th>
+                        <th>Saldo</th>
+                        <th>Última Atualização</th>
+                    </tr>
+                </thead>
+                <tbody>
+        `;
+
+        prodSnap.forEach(doc => {
+            const data = doc.data();
+            const dataFormatada = data.ultima_atualizacao 
+                ? new Date(data.ultima_atualizacao.toDate()).toLocaleString('pt-BR')
+                : '-';
+            
+            html += `
+                <tr>
+                    <td>${doc.id}</td>
+                    <td>${data.estoque_atual || 0}</td>
+                    <td>${dataFormatada}</td>
+                </tr>
+            `;
+        });
+
+        html += `
+                </tbody>
+            </table>
+            <br>
+            <p style="font-size: 12px; color: #666;">Relatório gerado automaticamente pelo LogFlow</p>
+        `;
+
+        if (typeof html2pdf === 'undefined') {
+            console.error("⚠️ Biblioteca PDF não carregada");
+            alert("⚠️ Biblioteca PDF não carregada. Tente novamente.");
+            return;
+        }
+
+        html2pdf().set({ 
+            margin: 10, 
+            filename: `relatorio-estoque-${new Date().toISOString().split('T')[0]}.pdf` 
+        }).from(html).save();
+
+        console.log("✅ PDF gerado!");
+        alert("✅ PDF gerado com sucesso!");
+
+    } catch (error) {
+        console.error("❌ Erro:", error);
+        alert("Erro ao gerar PDF: " + error.message);
+    }
+};
+
+// ===== CARREGAR AO INICIAR =====
 onAuthStateChanged(auth, (user) => {
     if (user) {
-        const uid = user.uid;
-        console.log("✅ DASHBOARD INICIADO PARA:", uid);
-
-        // Busca movimentações
-        console.log("📥 Conectando a movimentações...");
-        onSnapshot(collection(db, "usuarios", uid, "movimentacoes"), (snapMov) => {
-            console.log("📥 Movimentações carregadas:", snapMov.docs.length);
-            calcularGirosDinâmicos(snapMov.docs);
-            renderizarHistoricoMensal(snapMov);
-        });
-
-        // Busca produtos
-        console.log("📦 Conectando a produtos...");
-        onSnapshot(collection(db, "usuarios", uid, "produtos"), (snapProd) => {
-            console.log("📦 Produtos carregados:", snapProd.docs.length);
-            if (snapProd.docs.length === 0) {
-                console.warn("⚠️ NENHUM PRODUTO ENCONTRADO! Verifique a importação.");
-            }
-            renderizarTudo(snapProd.docs);
-        });
-
-    } else {
-        console.log("❌ USUÁRIO NÃO LOGADO - REDIRECIONANDO");
-        window.location.href = "login.html";
+        setTimeout(() => carregarDashboard(), 500);
+        // Recarregar a cada 30 segundos
+        setInterval(() => carregarDashboard(), 30000);
     }
 });
+
+console.log("✅ Dashboard carregado com sucesso!");

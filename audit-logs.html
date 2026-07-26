@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LogFlow - Auditoria</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background: #f8fafc;
+            color: #1e293b;
+            padding: 20px;
+        }
+
+        body.dark-mode {
+            background: #0f1419;
+            color: #e2e8f0;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: auto;
+        }
+
+        .navbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 15px 20px;
+            background: white;
+            border-bottom: 1px solid #e2e8f0;
+            margin-bottom: 20px;
+            border-radius: 8px;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        body.dark-mode .navbar {
+            background: #1a202c;
+            border-color: #334155;
+        }
+
+        .navbar h1 {
+            color: #001F5B;
+            font-size: 1.5rem;
+        }
+
+        .btn {
+            padding: 8px 15px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 13px;
+            transition: all 0.3s;
+        }
+
+        .btn-primary {
+            background: #001F5B;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #003a9e;
+        }
+
+        .btn-toggle {
+            background: #f3f4f6;
+            color: #1e293b;
+            border: 1px solid #e2e8f0;
+        }
+
+        body.dark-mode .btn-toggle {
+            background: #334155;
+            color: #e2e8f0;
+        }
+
+        .card {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            margin-bottom: 20px;
+        }
+
+        body.dark-mode .card {
+            background: #1a202c;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .card h2 {
+            color: #001F5B;
+            margin-bottom: 20px;
+            font-size: 1.3rem;
+            border-bottom: 2px solid #001F5B;
+            padding-bottom: 10px;
+        }
+
+        .filters {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        select, input {
+            padding: 10px;
+            border: 1px solid #e2e8f0;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+
+        body.dark-mode select,
+        body.dark-mode input {
+            background: #334155;
+            border-color: #475569;
+            color: #e2e8f0;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 14px;
+        }
+
+        th {
+            background: #f1f5f9;
+            padding: 12px;
+            text-align: left;
+            font-weight: bold;
+            color: #001F5B;
+            border-bottom: 2px solid #e2e8f0;
+        }
+
+        body.dark-mode th {
+            background: #334155;
+            color: #00d4ff;
+            border-color: #475569;
+        }
+
+        td {
+            padding: 12px;
+            border-bottom: 1px solid #e2e8f0;
+        }
+
+        body.dark-mode td {
+            border-color: #334155;
+        }
+
+        tr:hover {
+            background: #f8fafc;
+        }
+
+        body.dark-mode tr:hover {
+            background: #334155;
+        }
+
+        .acao {
+            font-weight: bold;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+        }
+
+        .acao-entrada {
+            background: #dcfce7;
+            color: #166534;
+        }
+
+        .acao-saida {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        .acao-login {
+            background: #e0e7ff;
+            color: #3730a3;
+        }
+
+        .acao-config {
+            background: #fef3c7;
+            color: #92400e;
+        }
+
+        .pagina {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            margin-top: 20px;
+        }
+
+        .btn-pagina {
+            padding: 8px 12px;
+            border: 1px solid #e2e8f0;
+            background: white;
+            cursor: pointer;
+            border-radius: 5px;
+        }
+
+        body.dark-mode .btn-pagina {
+            background: #334155;
+            border-color: #475569;
+            color: #e2e8f0;
+        }
+
+        .btn-pagina.ativo {
+            background: #001F5B;
+            color: white;
+            border-color: #001F5B;
+        }
+
+        .vazio {
+            text-align: center;
+            padding: 40px;
+            color: #999;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #999;
+        }
+
+        .resumo {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .resumo-card {
+            background: #f1f5f9;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+            border-left: 4px solid #001F5B;
+        }
+
+        body.dark-mode .resumo-card {
+            background: #334155;
+            color: #e2e8f0;
+        }
+
+        .resumo-card strong {
+            display: block;
+            font-size: 24px;
+            color: #001F5B;
+            margin-bottom: 5px;
+        }
+
+        body.dark-mode .resumo-card strong {
+            color: #00d4ff;
+        }
+
+        .resumo-card p {
+            font-size: 12px;
+            color: #666;
+        }
+
+        body.dark-mode .resumo-card p {
+            color: #cbd5e1;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="navbar">
+        <h1>📊 Auditoria</h1>
+        <div style="display: flex; gap: 10px;">
+            <button class="btn btn-primary" onclick="window.location.href='dashboard.html'">📊 DASHBOARD</button>
+            <button class="btn btn-toggle" onclick="alternarTema()">🌙 Tema</button>
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>📝 Logs de Auditoria</h2>
+
+        <div class="resumo">
+            <div class="resumo-card">
+                <strong id="totalEntradas">0</strong>
+                <p>📥 Entradas</p>
+            </div>
+            <div class="resumo-card">
+                <strong id="totalSaidas">0</strong>
+                <p>📤 Saídas</p>
+            </div>
+            <div class="resumo-card">
+                <strong id="totalAcoes">0</strong>
+                <p>🔄 Total de Ações</p>
+            </div>
+            <div class="resumo-card">
+                <strong id="ultimaAtividade">-</strong>
+                <p>⏰ Última Atividade</p>
+            </div>
+        </div>
+
+        <div class="filters">
+            <select id="filtroAcao">
+                <option value="">Todas as ações</option>
+                <option value="ENTRADA_REALIZADA">📥 Entradas</option>
+                <option value="SAIDA_REALIZADA">📤 Saídas</option>
+                <option value="LOGIN">🔓 Logins</option>
+                <option value="CONFIG_ALTERADA">⚙️ Configurações</option>
+            </select>
+
+            <input type="month" id="filtroData" placeholder="Filtrar por mês e ano">
+            <button class="btn btn-primary" onclick="carregarLogs()">🔍 Filtrar</button>
+            <button class="btn btn-primary" onclick="exportarCSV()">📥 Exportar CSV</button>
+        </div>
+
+        <div id="conteudo">
+            <div class="loading">⏳ Carregando logs...</div>
+        </div>
+
+        <div class="pagina" id="paginacao"></div>
+    </div>
+</div>
+
+<script type="module">
+import { verificarAutenticacao } from './auth.js';
+verificarAutenticacao();
+
+import { initializeApp, getApps, getApp } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-app.js";
+import { getFirestore, collection, query, orderBy, limit, offset, getDocs } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore.js";
+import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-auth.js";
+import { httpsCallable, getFunctions } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-functions.js";
+
+const firebaseConfig = {
+    apiKey: "AIzaSyBVu2nD3RJg5q-CH-oyxJvn-6agQw09rsA",
+    authDomain: "sistema-de-estoque-8ff60.firebaseapp.com",
+    projectId: "sistema-de-estoque-8ff60",
+    storageBucket: "sistema-de-estoque-8ff60.firebasestorage.app",
+    messagingSenderId: "350798221431",
+    appId: "1:350798221431:web:ee97b59412b5aa0da2b672"
+};
+
+const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
+const db = getFirestore(app);
+const auth = getAuth(app);
+const functions = getFunctions(app);
+const obterAuditLogs = httpsCallable(functions, 'obterAuditLogs');
+
+let paginaAtual = 0;
+const LIMITE = 20;
+let todosOsLogs = [];
+
+// Tema escuro
+window.alternarTema = () => {
+    document.documentElement.style.colorScheme = document.body.classList.toggle('dark-mode') ? 'dark' : 'light';
+    localStorage.setItem('tema', document.body.classList.contains('dark-mode') ? 'dark' : 'light');
+};
+
+if (localStorage.getItem('tema') === 'dark') {
+    document.body.classList.add('dark-mode');
+    document.documentElement.style.colorScheme = 'dark';
+}
+
+// Carregar logs
+window.carregarLogs = async () => {
+    const user = auth.currentUser;
+    if (!user) {
+        alert("Você não está logado!");
+        return;
+    }
+
+    try {
+        document.getElementById('conteudo').innerHTML = '<div class="loading">⏳ Carregando logs...</div>';
+        
+        const resultado = await obterAuditLogs({ limite: 1000, pagina: 0 });
+        todosOsLogs = resultado.data.logs || [];
+
+        const filtroAcao = document.getElementById('filtroAcao').value;
+        const filtroData = document.getElementById('filtroData').value; // Formato: YYYY-MM
+
+        let logsFiltrados = todosOsLogs;
+
+        if (filtroAcao) {
+            logsFiltrados = logsFiltrados.filter(log => log.acao === filtroAcao);
+        }
+
+        if (filtroData) {
+            logsFiltrados = logsFiltrados.filter(log => {
+                // Formata data como YYYY-MM para comparar
+                const dataLog = new Date(log.timestamp).toISOString().slice(0, 7); // Pega YYYY-MM
+                return dataLog === filtroData;
+            });
+        }
+
+        paginaAtual = 0;
+        mostrarLogs(logsFiltrados);
+        atualizarResumo(logsFiltrados);
+
+    } catch (error) {
+        console.error("❌ Erro:", error);
+        document.getElementById('conteudo').innerHTML = `<div class="vazio">❌ Erro ao carregar logs: ${error.message}</div>`;
+    }
+};
+
+function mostrarLogs(logs) {
+    const inicio = paginaAtual * LIMITE;
+    const fim = inicio + LIMITE;
+    const logsPagina = logs.slice(inicio, fim);
+
+    if (logsPagina.length === 0) {
+        document.getElementById('conteudo').innerHTML = '<div class="vazio">📭 Nenhum log encontrado</div>';
+        document.getElementById('paginacao').innerHTML = '';
+        return;
+    }
+
+    let html = '<table><thead><tr>';
+    html += '<th>📅 Data/Hora</th>';
+    html += '<th>🔔 Ação</th>';
+    html += '<th>📦 Detalhes</th>';
+    html += '</tr></thead><tbody>';
+
+    logsPagina.forEach(log => {
+        const data = new Date(log.timestamp).toLocaleString('pt-BR');
+        const tipoAcao = log.acao.includes('ENTRADA') ? 'entrada' : 
+                        log.acao.includes('SAIDA') ? 'saida' : 
+                        log.acao.includes('LOGIN') ? 'login' : 'config';
+
+        let detalhes = JSON.stringify(log.dados || {});
+        if (detalhes.length > 50) detalhes = detalhes.substring(0, 50) + '...';
+
+        html += '<tr>';
+        html += `<td>${data}</td>`;
+        html += `<td><span class="acao acao-${tipoAcao}">${log.acao}</span></td>`;
+        html += `<td><code>${detalhes}</code></td>`;
+        html += '</tr>';
+    });
+
+    html += '</tbody></table>';
+
+    document.getElementById('conteudo').innerHTML = html;
+
+    // Paginação
+    const totalPaginas = Math.ceil(logs.length / LIMITE);
+    let paginationHtml = '';
+
+    for (let i = 0; i < totalPaginas; i++) {
+        paginationHtml += `<button class="btn-pagina ${i === paginaAtual ? 'ativo' : ''}" onclick="mudarPagina(${i})">${i + 1}</button>`;
+    }
+
+    document.getElementById('paginacao').innerHTML = paginationHtml || '';
+}
+
+window.mudarPagina = (novaPagina) => {
+    paginaAtual = novaPagina;
+    const filtroAcao = document.getElementById('filtroAcao').value;
+    let logsFiltrados = todosOsLogs;
+
+    if (filtroAcao) {
+        logsFiltrados = logsFiltrados.filter(log => log.acao === filtroAcao);
+    }
+
+    mostrarLogs(logsFiltrados);
+};
+
+function atualizarResumo(logs) {
+    const entradas = logs.filter(l => l.acao === 'ENTRADA_REALIZADA').length;
+    const saidas = logs.filter(l => l.acao === 'SAIDA_REALIZADA').length;
+    
+    const ultima = logs.length > 0 ? new Date(logs[0].timestamp).toLocaleString('pt-BR') : '-';
+
+    document.getElementById('totalEntradas').textContent = entradas;
+    document.getElementById('totalSaidas').textContent = saidas;
+    document.getElementById('totalAcoes').textContent = logs.length;
+    document.getElementById('ultimaAtividade').textContent = ultima;
+}
+
+window.exportarCSV = () => {
+    if (todosOsLogs.length === 0) {
+        alert("Nenhum log para exportar!");
+        return;
+    }
+
+    let csv = 'Data,Ação,Detalhes\n';
+    todosOsLogs.forEach(log => {
+        const data = new Date(log.timestamp).toLocaleString('pt-BR');
+        const detalhes = JSON.stringify(log.dados || {}).replace(/"/g, '""');
+        csv += `"${data}","${log.acao}","${detalhes}"\n`;
+    });
+
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `audit-logs-${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+};
+
+// Carregar logs ao abrir a página
+onAuthStateChanged(auth, (user) => {
+    if (user) {
+        setTimeout(() => window.carregarLogs(), 500);
+    }
+});
+
+</script>
+
+<script>
+// Função de tema (deve estar ANTES do módulo)
+window.alternarTema = () => {
+    document.documentElement.style.colorScheme = document.body.classList.toggle('dark-mode') ? 'dark' : 'light';
+    localStorage.setItem('tema', document.body.classList.contains('dark-mode') ? 'dark' : 'light');
+};
+
+if (localStorage.getItem('tema') === 'dark') {
+    document.body.classList.add('dark-mode');
+    document.documentElement.style.colorScheme = 'dark';
+}
+</script>
+
+</body>
+</html>

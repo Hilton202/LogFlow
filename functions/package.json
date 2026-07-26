@@ -1,6 +1,12 @@
 {
-  "name": "functions",
-  "description": "Cloud Functions for Firebase",
+  "name": "logflow-functions",
+  "description": "Cloud Functions para LogFlow - Validação server-side, Rate Limiting, Audit Logs",
+  "version": "1.0.0",
+  "private": true,
+  "engines": {
+    "node": "18"
+  },
+  "main": "index.js",
   "scripts": {
     "serve": "firebase emulators:start --only functions",
     "shell": "firebase functions:shell",
@@ -8,16 +14,17 @@
     "deploy": "firebase deploy --only functions",
     "logs": "firebase functions:log"
   },
-  "engines": {
-    "node": "24"
-  },
-  "main": "index.js",
   "dependencies": {
-    "firebase-admin": "^13.6.0",
-    "firebase-functions": "^7.0.0"
+    "firebase-admin": "^11.10.1",
+    "firebase-functions": "^4.4.1",
+    "node-fetch": "^2.7.0"
   },
   "devDependencies": {
-    "firebase-functions-test": "^3.4.1"
+    "firebase-functions-test": "^3.1.0"
   },
-  "private": true
+  "esmodules": false,
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs"
 }

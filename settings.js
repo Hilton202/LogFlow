@@ -18,6 +18,42 @@ const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 const db = getFirestore(app);
 const auth = getAuth(app);
 
+// ===== CRIPTOGRAFIA SIMPLES =====
+// ⚠️ NÃO é militar-grade, mas previne acesso casual ao Firestore
+function criptografarToken(token, uid) {
+    // Derivar chave do UID (cada usuário tem sua chave única)
+    const chave = uid.substring(0, 16); // Primeiros 16 chars do UID
+    
+    // Simples XOR + Base64 (não use em produção sensível!)
+    let criptografado = '';
+    for (let i = 0; i < token.length; i++) {
+        criptografado += String.fromCharCode(
+            token.charCodeAt(i) ^ chave.charCodeAt(i % chave.length)
+        );
+    }
+    
+    return btoa(criptografado); // Base64 encode
+}
+
+function descriptografarToken(tokenCriptografado, uid) {
+    try {
+        const chave = uid.substring(0, 16);
+        const descriptografado = atob(tokenCriptografado); // Base64 decode
+        
+        let token = '';
+        for (let i = 0; i < descriptografado.length; i++) {
+            token += String.fromCharCode(
+                descriptografado.charCodeAt(i) ^ chave.charCodeAt(i % chave.length)
+            );
+        }
+        
+        return token;
+    } catch (error) {
+        console.error("❌ Erro ao descriptografar token:", error);
+        return null;
+    }
+}
+
 // ===== TEMA ESCURO =====
 window.alternarTema = () => {
     document.documentElement.style.colorScheme = document.body.classList.toggle('dark-mode') ? 'dark' : 'light';
@@ -58,14 +94,20 @@ onAuthStateChanged(auth, async (user) => {
 
         if (configSnap.exists()) {
             const dados = configSnap.data();
-            telegramToken.value = dados.token || '';
+            
+            // ✅ Descriptografar token antes de mostrar
+            const tokenDescriptografado = dados.tokenCriptografado 
+                ? descriptografarToken(dados.tokenCriptografado, user.uid)
+                : '';
+            
+            telegramToken.value = tokenDescriptografado || '';
             telegramChatId.value = dados.chatId || '';
             ativarNotificacoes.checked = dados.ativo !== false;
             document.getElementById('alertasEstoqueCritico').checked = dados.alertasEstoqueCritico !== false;
             document.getElementById('alertasEntrada').checked = dados.alertasEntrada !== false;
             document.getElementById('alertasSaida').checked = dados.alertasSaida !== false;
             
-            console.log("✅ Configurações carregadas");
+            console.log("✅ Configurações carregadas com segurança");
         } else {
             console.log("📝 Primeira vez - nenhuma configuração salva");
         }
@@ -93,12 +135,27 @@ formConfiguracao.addEventListener('submit', async (e) => {
         return;
     }
 
+    // ✅ Validar token (deve ter dois pontos)
+    if (!token.includes(':')) {
+        mostrarMensagem("⚠️ Token inválido! Deve estar no formato: 123456:ABC-DEF...", 'erro');
+        return;
+    }
+
+    // ✅ Validar Chat ID (deve ser número)
+    if (!/^\d+$/.test(chatId)) {
+        mostrarMensagem("⚠️ Chat ID deve ser apenas números!", 'erro');
+        return;
+    }
+
     try {
+        // 🔐 CRIPTOGRAFAR token antes de salvar
+        const tokenCriptografado = criptografarToken(token, user.uid);
+        
         const configRef = doc(db, "usuarios", user.uid, "configuracoes", "telegram");
         
         await setDoc(configRef, {
-            token,
-            chatId,
+            tokenCriptografado,  // ← Salva CRIPTOGRAFADO!
+            chatId,              // ← Chat ID é público (não tem problema)
             ativo: ativarNotificacoes.checked,
             alertasEstoqueCritico: document.getElementById('alertasEstoqueCritico').checked,
             alertasEntrada: document.getElementById('alertasEntrada').checked,
@@ -106,8 +163,8 @@ formConfiguracao.addEventListener('submit', async (e) => {
             ultimaAtualizacao: new Date().toISOString()
         });
 
-        mostrarMensagem("✅ Configurações salvas com sucesso!", 'sucesso');
-        console.log("💾 Configurações de Telegram salvas!");
+        mostrarMensagem("✅ Configurações salvas com segurança!", 'sucesso');
+        console.log("💾 Configurações de Telegram salvas (criptografadas)!");
     } catch (error) {
         console.error("❌ Erro ao salvar:", error);
         mostrarMensagem("Erro ao salvar: " + error.message, 'erro');
@@ -141,7 +198,14 @@ window.testarConexao = async () => {
             mostrarMensagem("✅ Teste enviado com sucesso! Verifique seu Telegram!", 'sucesso');
             console.log("📤 Mensagem de teste enviada!");
         } else {
-            mostrarMensagem("❌ Erro: " + (resultado.description || "Falha na conexão"), 'erro');
+            if (resultado.error_code === 403) {
+                mostrarMensagem(
+                    "❌ Erro 403: Acesso negado!\n\n💡 SOLUÇÃO:\n1. Abra o Telegram\n2. Procure por seu bot\n3. Clique em START\n4. Volte aqui e teste novamente!",
+                    'erro'
+                );
+            } else {
+                mostrarMensagem("❌ Erro: " + (resultado.description || "Falha na conexão"), 'erro');
+            }
             console.error("Erro Telegram:", resultado);
         }
     } catch (error) {

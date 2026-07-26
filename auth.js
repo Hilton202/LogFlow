@@ -14,26 +14,42 @@ const firebaseConfig = {
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 const auth = getAuth(app);
 
-// 1. Lógica de Login
-const btnLogin = document.getElementById('btnLogin');
-if (btnLogin) {
-    btnLogin.onclick = () => {
-        const email = document.getElementById('email').value;
-        const password = document.getElementById('password').value;
+// ===== FUNÇÃO DE LOGIN (chamada quando elemento existe) =====
+export function inicializarLogin() {
+    const btnLogin = document.getElementById('btnLogin');
+    if (btnLogin) {
+        btnLogin.onclick = () => {
+            const email = document.getElementById('email')?.value;
+            const password = document.getElementById('password')?.value;
 
-        signInWithEmailAndPassword(auth, email, password)
-            .then(() => {
-                window.location.href = 'index.html'; 
-            })
-            .catch((error) => {
-                console.error(error);
+            if (!email || !password) {
                 const msgErro = document.getElementById('msgErro');
-                if (msgErro) msgErro.innerText = "E-mail ou senha incorretos.";
-            });
-    };
+                if (msgErro) msgErro.innerText = "Preencha email e senha!";
+                return;
+            }
+
+            signInWithEmailAndPassword(auth, email, password)
+                .then(() => {
+                    window.location.href = 'index.html'; 
+                })
+                .catch((error) => {
+                    console.error("Erro de login:", error.code);
+                    const msgErro = document.getElementById('msgErro');
+                    if (msgErro) {
+                        if (error.code === 'auth/user-not-found') {
+                            msgErro.innerText = "Usuário não encontrado!";
+                        } else if (error.code === 'auth/wrong-password') {
+                            msgErro.innerText = "Senha incorreta!";
+                        } else {
+                            msgErro.innerText = "Erro ao fazer login. Tente novamente.";
+                        }
+                    }
+                });
+        };
+    }
 }
 
-// 2. Verificação de Autenticação (Proteção de Páginas)
+// ===== VERIFICAÇÃO DE AUTENTICAÇÃO (Proteção de Páginas) =====
 export function verificarAutenticacao() {
     onAuthStateChanged(auth, (user) => {
         const paginaAtual = window.location.pathname;
@@ -45,7 +61,7 @@ export function verificarAutenticacao() {
     });
 }
 
-// 3. Função de Sair (EXPORTADA corretamente agora)
+// ===== FUNÇÃO DE LOGOUT =====
 export function logout() {
     signOut(auth).then(() => {
         window.location.href = 'login.html';
@@ -54,5 +70,6 @@ export function logout() {
     });
 }
 
-// Vincula ao window para garantir que o botão no HTML encontre a função
+// Vincula ao window para garantir acessibilidade
 window.logout = logout;
+window.inicializarLogin = inicializarLogin;
