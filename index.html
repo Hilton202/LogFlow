@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="shortcut icon" href="img/logflow_logo.png" type="image/x-icon">
     <title>LogFlow - Scanner</title>
     <style>
         * {
@@ -350,6 +351,40 @@
                 padding: 20px;
             }
         }
+        @keyframes slideDown {
+        from {
+            opacity: 0;
+            transform: translateY(-10px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+        }
+
+        label[type="checkbox"] {
+            transition: all 0.3s ease;
+        }
+
+        label[type="checkbox"]:hover {
+            background: #e8ecf1 !important;
+            border-color: #001F5B !important;
+        }
+
+        #temValidade:checked {
+            accent-color: #001F5B;
+        }
+
+        body.dark-mode label[type="checkbox"] {
+            background: #334155 !important;
+        }
+
+        body.dark-mode label[type="checkbox"]:hover {
+            background: #475569 !important;
+        }
+        input, textarea, select, button {
+            font-size: 16px;
+        }
     </style>
 </head>
 <body>
@@ -357,11 +392,12 @@
 <div class="container">
     <!-- NAVBAR -->
     <div class="navbar">
-        <h1>📦 LogFlow</h1>
+        <h1><img src="img/logflow_logo.png" alt="logo" style="width: 80px; height: 80px;"> LogFlow</h1>
         <div class="navbar-actions">
             <button class="btn btn-primary" onclick="window.location.href='dashboard.html'">📊 DASHBOARD</button>
             <button class="btn btn-primary" onclick="window.location.href='audit-logs.html'">📝 AUDITORIA</button>
             <button class="btn btn-toggle" onclick="alternarTema()">🌙 Tema</button>
+             <button class="btn btn-primary" style="background: #dc2626;" onclick="logout()">🚪 SAIR</button>
         </div>
     </div>
 
@@ -378,8 +414,10 @@
             </div>
         </div>
 
-        <!-- QR CODE / SCANNER -->
-        <button class="button-qrcode" onclick="alert('🔄 Função de QR Code em desenvolvimento!')">📷 LER QR CODE / BIPE</button>
+        <!-- Scanner QR Code -->
+        <div id="scanner-qr" style="display: none; width: 100%; margin: 15px 0; border-radius: 8px; overflow: hidden;"></div>
+
+        <button class="button-qrcode" id="btnQRCode">📷 LER QR CODE / BIPE</button>
 
         <!-- FORMULÁRIO -->
         <form id="formEstoque" onsubmit="enviarLancamento(event)">
@@ -387,6 +425,10 @@
             <div class="form-group">
                 <label for="codigo">Código do Produto</label>
                 <input type="text" id="codigo" placeholder="Digite ou escaneie o código..." required>
+                
+                <!-- AUTOCOMPLETE AQUI -->
+                <div id="autocompleteLista" style="display: none; background: white; border: 1px solid #ddd; border-radius: 6px; margin-top: 5px; max-height: 200px; overflow-y: auto; box-shadow: 0 4px 8px rgba(0,0,0,0.1);"></div>
+                
                 <div class="saldo-info" id="alertaEstoque">
                     <strong>Saldo Atual:</strong>
                     <div class="number" id="saldoAtual">0</div>
@@ -405,6 +447,18 @@
                 <input type="text" id="referencia" placeholder="Ex: NF 1010 ou Cliente X">
             </div>
 
+            <div class="form-group">
+                <label style="display: flex; align-items: center; gap: 12px; padding: 12px; background: #f0f4f8; border-radius: 8px; cursor: pointer; border: 2px solid transparent; transition: all 0.3s;">
+                    <input type="checkbox" id="temValidade" onchange="toggleValidade()" style="width: 20px; height: 20px; cursor: pointer;">
+                    <span style="font-weight: 600; color: #1e293b; font-size: 14px;">⏰ Produto tem validade?</span>
+                </label>
+            </div>
+
+            <div class="form-group" id="dataValidadeGroup" style="display: none; animation: slideDown 0.3s ease-in-out;">
+                <label>Data de Validade</label>
+                <input type="date" id="dataValidade" style="font-size: 14px;">
+            </div>
+            
             <!-- ALERTA -->
             <div class="alert" id="mensagemEstoque"></div>
 
@@ -419,178 +473,13 @@
     <!-- ATALHOS -->
     <div class="card">
         <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-            <button class="btn btn-primary" onclick="window.location.href='gerar-etiquetas.html'" style="flex: 1;">🎫 GERAR ETIQUETAS</button>
+            <button class="btn btn-primary" onclick="window.location.href='etiquetas.html'" style="flex: 1;">🎫 GERAR ETIQUETAS</button>
+            <button class="btn btn-primary" onclick="window.location.href='importar_xml.html'" style="flex: 1;">📊 IMPORTAR PLANILHA</button>
             <button class="btn btn-primary" onclick="window.location.href='settings.html'" style="flex: 1;">⚙️ CONFIGURAÇÕES</button>
         </div>
     </div>
 </div>
-
-<!-- FUNÇÃO DE TEMA -->
-<script>
-window.alternarTema = () => {
-    document.documentElement.style.colorScheme = document.body.classList.toggle('dark-mode') ? 'dark' : 'light';
-    localStorage.setItem('tema', document.body.classList.contains('dark-mode') ? 'dark' : 'light');
-};
-
-if (localStorage.getItem('tema') === 'dark') {
-    document.body.classList.add('dark-mode');
-    document.documentElement.style.colorScheme = 'dark';
-}
-
-// TIPO DE OPERAÇÃO
-let operacaoAtual = "ENTRADA";
-
-window.selecionarTipo = (tipo) => {
-    operacaoAtual = tipo;
-    document.getElementById('btnEntrada').classList.remove('active');
-    document.getElementById('btnSaida').classList.remove('active', 'saida');
-    
-    if (tipo === 'ENTRADA') {
-        document.getElementById('btnEntrada').classList.add('active');
-    } else {
-        document.getElementById('btnSaida').classList.add('active', 'saida');
-    }
-};
-</script>
-
-<!-- FIREBASE E CLOUD FUNCTIONS -->
-<script type="module">
-import { verificarAutenticacao } from './auth.js';
-verificarAutenticacao();
-
-import { initializeApp, getApps, getApp } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-app.js";
-import { getFirestore, doc, getDoc, collection, onSnapshot } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore.js";
-import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-auth.js";
-import { httpsCallable, getFunctions } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-functions.js";
-
-const firebaseConfig = {
-    apiKey: "AIzaSyBVu2nD3RJg5q-CH-oyxJvn-6agQw09rsA",
-    authDomain: "sistema-de-estoque-8ff60.firebaseapp.com",
-    projectId: "sistema-de-estoque-8ff60",
-    storageBucket: "sistema-de-estoque-8ff60.firebasestorage.app",
-    messagingSenderId: "350798221431",
-    appId: "1:350798221431:web:ee97b59412b5aa0da2b672"
-};
-
-const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
-const db = getFirestore(app);
-const auth = getAuth(app);
-const functions = getFunctions(app);
-const lancarMovimentacao = httpsCallable(functions, 'lancarMovimentacao');
-
-let produtosDisponiveis = {};
-
-// ===== MONITORAR PRODUTOS =====
-onAuthStateChanged(auth, (user) => {
-    if (!user) return;
-    
-    onSnapshot(collection(db, "usuarios", user.uid, "produtos"), (snapshot) => {
-        produtosDisponiveis = {};
-        snapshot.forEach(doc => {
-            produtosDisponiveis[doc.id] = doc.data().estoque_atual || 0;
-        });
-        console.log("✅ Produtos carregados:", Object.keys(produtosDisponiveis).length);
-    });
-});
-
-// ===== BUSCAR SALDO =====
-async function buscarSaldo() {
-    const user = auth.currentUser;
-    if (!user) return;
-    
-    const codigo = document.getElementById('codigo').value.trim().toUpperCase();
-    if (!codigo) {
-        document.getElementById('alertaEstoque').style.display = 'none';
-        return;
-    }
-    
-    try {
-        const docRef = doc(db, "usuarios", user.uid, "produtos", codigo);
-        const docSnap = await getDoc(docRef);
-        
-        if (docSnap.exists()) {
-            document.getElementById('saldoAtual').innerText = docSnap.data().estoque_atual || 0;
-        } else {
-            document.getElementById('saldoAtual').innerText = "0 (Novo)";
-        }
-        document.getElementById('alertaEstoque').style.display = 'block';
-    } catch (error) {
-        console.error("❌ Erro:", error);
-    }
-}
-
-document.getElementById('codigo').addEventListener('change', buscarSaldo);
-document.getElementById('codigo').addEventListener('blur', () => setTimeout(buscarSaldo, 100));
-
-// ===== ENVIAR LANÇAMENTO =====
-window.enviarLancamento = async (event) => {
-    event.preventDefault();
-    
-    const user = auth.currentUser;
-    if (!user) {
-        alert("❌ Você não está logado!");
-        return;
-    }
-
-    const codigo = document.getElementById('codigo').value.trim().toUpperCase();
-    const quantidade = Number(document.getElementById('quantidade').value);
-    const referencia = document.getElementById('referencia').value.trim() || "SEM REF";
-
-    if (!codigo || !quantidade) {
-        alert("⚠️ Preencha código e quantidade!");
-        return;
-    }
-
-    const loader = document.getElementById('loader');
-    const btnSubmit = document.getElementById('btnSubmit');
-    const mensagem = document.getElementById('mensagemEstoque');
-
-    loader.classList.add('active');
-    btnSubmit.disabled = true;
-
-    try {
-        console.log(`📤 Enviando: ${operacaoAtual} de ${codigo}...`);
-        
-        const resultado = await lancarMovimentacao({
-            codigo,
-            quantidade,
-            tipo: operacaoAtual,
-            referencia
-        });
-
-        mensagem.className = 'alert success';
-        mensagem.innerText = `✅ ${resultado.data.mensagem}`;
-        mensagem.style.display = 'block';
-
-        document.getElementById('formEstoque').reset();
-        document.getElementById('alertaEstoque').style.display = 'none';
-        document.getElementById('codigo').focus();
-        
-        setTimeout(() => {
-            mensagem.style.display = 'none';
-        }, 3000);
-
-    } catch (error) {
-        console.error("❌ Erro:", error);
-        
-        let textoErro = error.message;
-        if (error.code === 'resource_exhausted') {
-            textoErro = `⚠️ MUITAS TENTATIVAS!\nAguarde ${error.details.proximaTentativaEm} segundos`;
-        } else if (error.code === 'failed-precondition') {
-            textoErro = `❌ SALDO INSUFICIENTE!\nVocê tem: ${error.details.saldoAtual}`;
-        }
-
-        mensagem.className = 'alert error';
-        mensagem.innerText = textoErro;
-        mensagem.style.display = 'block';
-    } finally {
-        loader.classList.remove('active');
-        btnSubmit.disabled = false;
-    }
-};
-
-console.log("✅ Scanner carregado com sucesso!");
-</script>
-
+<script type="module" src="index.js"></script>
+<script type="module" src="qrcode-scanner.js"></script>
 </body>
 </html>

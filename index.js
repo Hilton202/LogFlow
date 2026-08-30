@@ -1,6 +1,8 @@
+// ===== AUTENTICAÇÃO LOCAL =====
 import { verificarAutenticacao } from './auth.js';
 verificarAutenticacao();
 
+// ===== IMPORTS FIREBASE (UNIFICADOS) =====
 import { initializeApp, getApps, getApp } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-app.js";
 import { 
     getFirestore, doc, setDoc, getDoc, addDoc, collection, 
@@ -10,6 +12,7 @@ import {
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-auth.js";
 import { httpsCallable, getFunctions } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-functions.js";
 
+// ===== CONFIGURAÇÃO & INICIALIZAÇÃO FIREBASE =====
 const firebaseConfig = {
     apiKey: "AIzaSyBVu2nD3RJg5q-CH-oyxJvn-6agQw09rsA",
     authDomain: "sistema-de-estoque-8ff60.firebaseapp.com",
@@ -27,20 +30,42 @@ const functions = getFunctions(app);
 // ===== CLOUD FUNCTIONS =====
 const lancarMovimentacao = httpsCallable(functions, 'lancarMovimentacao');
 
+// ===== ESTADOS DA APLICAÇÃO =====
 let operacaoAtual = "ENTRADA";
 let produtosDisponiveis = {};
 let tentativasFalhadas = 0;
 
 // ===== TEMA ESCURO =====
 window.alternarTema = () => {
-    document.documentElement.style.colorScheme = document.body.classList.toggle('dark-mode') ? 'dark' : 'light';
-    localStorage.setItem('tema', document.body.classList.contains('dark-mode') ? 'dark' : 'light');
+    const isDark = document.body.classList.toggle('dark-mode');
+    document.documentElement.style.colorScheme = isDark ? 'dark' : 'light';
+    localStorage.setItem('tema', isDark ? 'dark' : 'light');
 };
 
 if (localStorage.getItem('tema') === 'dark') {
     document.body.classList.add('dark-mode');
     document.documentElement.style.colorScheme = 'dark';
 }
+
+// ===== SELEÇÃO DE TIPO DE OPERAÇÃO =====
+window.selecionarTipo = (tipo) => {
+    operacaoAtual = tipo;
+    const btnEntrada = document.getElementById('btnEntrada');
+    const btnSaida = document.getElementById('btnSaida');
+
+    if (btnEntrada) btnEntrada.classList.remove('active');
+    if (btnSaida) btnSaida.classList.remove('active', 'saida');
+    
+    if (tipo === 'ENTRADA') {
+        if (btnEntrada) btnEntrada.classList.add('active');
+    } else {
+        if (btnSaida) btnSaida.classList.add('active', 'saida');
+    }
+};
+
+window.addEventListener('tipoAlterado', (e) => { 
+    operacaoAtual = e.detail; 
+});
 
 // ===== MONITORA PRODUTOS EM TEMPO REAL =====
 onAuthStateChanged(auth, (user) => {
@@ -53,9 +78,9 @@ onAuthStateChanged(auth, (user) => {
     
     onSnapshot(collection(db, "usuarios", user.uid, "produtos"), (snapshot) => {
         produtosDisponiveis = {};
-        snapshot.forEach(doc => {
-            const codigo = doc.id;
-            const saldo = doc.data().estoque_atual || 0;
+        snapshot.forEach(docSnap => {
+            const codigo = docSnap.id;
+            const saldo = docSnap.data().estoque_atual || 0;
             produtosDisponiveis[codigo] = saldo;
         });
         console.log("📦 Produtos em cache:", Object.keys(produtosDisponiveis).length);
@@ -67,9 +92,13 @@ async function buscarSaldo() {
     const user = auth.currentUser;
     if (!user) return;
     
-    const codigo = document.getElementById('codigo')?.value.trim().toUpperCase();
+    const inputCodigo = document.getElementById('codigo');
+    const codigo = inputCodigo?.value.trim().toUpperCase();
+    const alertaDiv = document.getElementById('alertaEstoque');
+    const saldoSpan = document.getElementById('saldoAtual');
+
     if (!codigo) {
-        document.getElementById('alertaEstoque').style.display = 'none';
+        if (alertaDiv) alertaDiv.style.display = 'none';
         return;
     }
     
@@ -78,9 +107,6 @@ async function buscarSaldo() {
     try {
         const docRef = doc(db, "usuarios", user.uid, "produtos", codigo);
         const docSnap = await getDoc(docRef);
-        
-        const saldoSpan = document.getElementById('saldoAtual');
-        const alertaDiv = document.getElementById('alertaEstoque');
         
         if (saldoSpan && alertaDiv) {
             if (docSnap.exists()) {
@@ -95,91 +121,21 @@ async function buscarSaldo() {
         }
     } catch (error) {
         console.error("❌ ERRO ao buscar saldo:", error);
-        const saldoSpan = document.getElementById('saldoAtual');
         if (saldoSpan) saldoSpan.innerText = "Erro";
     }
 }
 
-if (document.getElementById('codigo')) {
-    document.getElementById('codigo').addEventListener('change', buscarSaldo);
-    document.getElementById('codigo').addEventListener('blur', () => setTimeout(buscarSaldo, 100));
+const elCodigo = document.getElementById('codigo');
+if (elCodigo) {
+    elCodigo.addEventListener('change', buscarSaldo);
+    elCodigo.addEventListener('blur', () => setTimeout(buscarSaldo, 100));
 }
 
-// ===== TIPO ALTERADO =====
-window.addEventListener('tipoAlterado', (e) => { operacaoAtual = e.detail; });
-
-// ===== FORMULÁRIO DE ENTRADA/SAÍDA =====
-const form = document.getElementById('formEstoque');
-if (form) {
-    form.onsubmit = async (e) => {
-        e.preventDefault();
-        
-        const user = auth.currentUser;
-        if (!user) {
-            alert("Você não está logado!");
-            return;
-        }
-
-        const codigo = document.getElementById('codigo')?.value.trim().toUpperCase();
-        const quantidade = Number(document.getElementById('quantidade').value);
-        const ref = document.getElementById('referencia')?.value.trim() || "SEM REF";
-        
-        if (!codigo || !quantidade) {
-            alert("⚠️ Preencha código e quantidade!");
-            return;
-        }
-
-        try {
-            console.log(`📤 Enviando para Cloud Function: ${operacaoAtual} de ${codigo}...`);
-            
-            // 🔐 CHAMAR CLOUD FUNCTION (validação server-side)
-            const resultado = await lancarMovimentacao({
-                codigo,
-                quantidade,
-                tipo: operacaoAtual,
-                referencia: ref
-            });
-
-            console.log("✅ Cloud Function respondeu:", resultado.data);
-            
-            form.reset();
-            alert(`✅ ${resultado.data.mensagem}`);
-            document.getElementById('codigo').focus();
-            tentativasFalhadas = 0;
-
-        } catch (error) {
-            console.error("❌ Erro:", error);
-            tentativasFalhadas++;
-            
-            if (error.code === 'resource_exhausted') {
-                alert(`⚠️ MUITAS TENTATIVAS!\n\nAguarde ${error.details.proximaTentativaEm} segundos`);
-            } else if (error.code === 'failed-precondition') {
-                alert(`❌ SALDO INSUFICIENTE!\n\nVocê tem: ${error.details.saldoAtual} unidades`);
-            } else if (error.code === 'not-found') {
-                alert(`❌ PRODUTO NÃO ENCONTRADO!`);
-            } else if (error.code === 'invalid-argument') {
-                alert(`⚠️ DADOS INVÁLIDOS!\n\n${error.message}`);
-            } else {
-                alert(`❌ Erro: ${error.message}`);
-            }
-            
-            if (tentativasFalhadas >= 5) {
-                alert("🔒 Muitas tentativas malsucedidas! Sistema bloqueado por 5 minutos!");
-                form.style.display = 'none';
-                setTimeout(() => {
-                    form.style.display = 'block';
-                    tentativasFalhadas = 0;
-                }, 5 * 60 * 1000);
-            }
-        }
-    };
-}
-
-// ===== FILTRO DE PRODUTOS =====
+// ===== AUTOCOMPLETE / FILTRO DE PRODUTOS =====
 const inputProduto = document.getElementById('inputProduto');
 const autocompleteLista = document.getElementById('autocompleteLista');
 
-if (inputProduto) {
+if (inputProduto && autocompleteLista) {
     inputProduto.addEventListener('input', () => {
         const valor = inputProduto.value.toUpperCase();
         
@@ -206,9 +162,106 @@ if (inputProduto) {
 }
 
 window.selecionarProduto = (codigo, saldo) => {
-    inputProduto.value = codigo;
-    autocompleteLista.style.display = 'none';
+    if (inputProduto) inputProduto.value = codigo;
+    if (autocompleteLista) autocompleteLista.style.display = 'none';
     console.log(`✅ Produto selecionado: ${codigo} (${saldo} un)`);
 };
 
-console.log("✅ Index (Scanner) carregado com sucesso!");
+// ===== ENVIO DE LANÇAMENTO =====
+window.enviarLancamento = async (event) => {
+    if (event) event.preventDefault();
+    
+    const user = auth.currentUser;
+    if (!user) {
+        alert("❌ Você não está logado!");
+        return;
+    }
+
+    const codigo = document.getElementById('codigo')?.value.trim().toUpperCase();
+    const quantidade = Number(document.getElementById('quantidade')?.value);
+    const referencia = document.getElementById('referencia')?.value.trim() || "SEM REF";
+
+    if (!codigo || !quantidade) {
+        alert("⚠️ Preencha código e quantidade!");
+        return;
+    }
+
+    const loader = document.getElementById('loader');
+    const btnSubmit = document.getElementById('btnSubmit');
+    const mensagem = document.getElementById('mensagemEstoque');
+    const form = document.getElementById('formEstoque');
+
+    if (loader) loader.classList.add('active');
+    if (btnSubmit) btnSubmit.disabled = true;
+
+    try {
+        console.log(`📤 Enviando: ${operacaoAtual} de ${codigo}...`);
+        
+        const resultado = await lancarMovimentacao({
+            codigo,
+            quantidade,
+            tipo: operacaoAtual,
+            referencia
+        });
+
+        if (mensagem) {
+            mensagem.className = 'alert success';
+            mensagem.innerText = `✅ ${resultado.data.mensagem}`;
+            mensagem.style.display = 'block';
+            setTimeout(() => { mensagem.style.display = 'none'; }, 3000);
+        } else {
+            alert(`✅ ${resultado.data.mensagem}`);
+        }
+
+        if (form) form.reset();
+        const alertaEstoque = document.getElementById('alertaEstoque');
+        if (alertaEstoque) alertaEstoque.style.display = 'none';
+        
+        document.getElementById('codigo')?.focus();
+        tentativasFalhadas = 0;
+
+    } catch (error) {
+        console.error("❌ Erro:", error);
+        tentativasFalhadas++;
+        
+        let textoErro = error.message;
+        if (error.code === 'resource_exhausted') {
+            textoErro = `⚠️ MUITAS TENTATIVAS!\nAguarde ${error.details?.proximaTentativaEm || ''} segundos`;
+        } else if (error.code === 'failed-precondition') {
+            textoErro = `❌ SALDO INSUFICIENTE!\nVocê tem: ${error.details?.saldoAtual} unidades`;
+        } else if (error.code === 'not-found') {
+            textoErro = `❌ PRODUTO NÃO ENCONTRADO!`;
+        } else if (error.code === 'invalid-argument') {
+            textoErro = `⚠️ DADOS INVÁLIDOS!\n${error.message}`;
+        }
+
+        if (mensagem) {
+            mensagem.className = 'alert error';
+            mensagem.innerText = textoErro;
+            mensagem.style.display = 'block';
+        } else {
+            alert(textoErro);
+        }
+
+        // Bloqueio por múltiplas falhas
+        if (tentativasFalhadas >= 5 && form) {
+            alert("🔒 Muitas tentativas malsucedidas! Sistema bloqueado por 5 minutos!");
+            form.style.display = 'none';
+            setTimeout(() => {
+                form.style.display = 'block';
+                tentativasFalhadas = 0;
+            }, 5 * 60 * 1000);
+        }
+    } finally {
+        if (loader) loader.classList.remove('active');
+        if (btnSubmit) btnSubmit.disabled = false;
+    }
+};
+
+// Vincula o evento de submit se o formulário existir no DOM
+const formEstoque = document.getElementById('formEstoque');
+if (formEstoque) {
+    formEstoque.onsubmit = window.enviarLancamento;
+}
+
+console.log("✅ Script de estoque otimizado e carregado com sucesso!");
