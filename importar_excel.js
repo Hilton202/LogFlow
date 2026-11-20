@@ -6,6 +6,7 @@ import {
     collection, 
     serverTimestamp 
 } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore.js";
+import { registrarAuditoria } from './db.js';
 
 const auth = getAuth();
 const input = document.getElementById('arquivoExcel');
@@ -47,12 +48,26 @@ input.addEventListener('change', (e) => {
                     return;
                 }
 
-                dadosParaImportar = jsonRaw.map(item => ({
-                    id: String(item[colCodigo]).trim().toUpperCase(),
-                    qtd: Number(item[colEstoque]) || 0
-                })).filter(item => item.id !== "");
+                if (jsonRaw.length > 5000) {
+                    alert('❌ Limite seguro excedido: selecione até 5.000 linhas por importação.');
+                    return;
+                }
 
-                console.log("📊 Excel parseado:", dadosParaImportar.length, "itens");
+                dadosParaImportar = jsonRaw.map(item => ({
+                    id: String(item[colCodigo] ?? '').trim().toUpperCase(),
+                    qtd: Number(item[colEstoque])
+                })).filter(item =>
+                    item.id !== '' &&
+                    Number.isFinite(item.qtd) &&
+                    item.qtd >= 0 &&
+                    item.qtd <= 999999
+                );
+
+                if (dadosParaImportar.length !== jsonRaw.length) {
+                    alert(`⚠️ ${jsonRaw.length - dadosParaImportar.length} linha(s) inválida(s) foram ignoradas.`);
+                }
+
+                console.log("📊 Excel validado:", dadosParaImportar.length, "itens");
                 exibirPrevia(dadosParaImportar);
                 
                 btnProcessar.disabled = false;
@@ -148,6 +163,17 @@ btnProcessar.onclick = async () => {
         console.log("📊 Total processado:", itemsProcessados);
         
         alert(`🚀 Sucesso! ${itemsProcessados} itens importados para:\n\nusuarios/${uid}/produtos`);
+        
+        // REGISTRA AUDITORIA
+        try {
+            await registrarAuditoria(uid, "IMPORTACAO_EXCEL", {
+                quantidade_itens: itemsProcessados,
+                origem: "Excel"
+            });
+            console.log("📝 Auditoria registrada com sucesso!");
+        } catch (err) {
+            console.error("❌ ERRO ao registrar auditoria:", err);
+        }
         
         setTimeout(() => {
             window.location.href = 'dashboard.html';

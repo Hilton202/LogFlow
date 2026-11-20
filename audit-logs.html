@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>LogFlow - Auditoria</title>
+    <link rel="shortcut icon" href="img/logflow_logo.png" type="image/png">
     <style>
         * {
             margin: 0;
@@ -266,6 +267,49 @@
         body.dark-mode .resumo-card p {
             color: #cbd5e1;
         }
+
+        #conteudo {
+            width: 100%;
+            overflow-x: auto;
+        }
+
+        code {
+            overflow-wrap: anywhere;
+            word-break: break-word;
+        }
+
+        @media (max-width: 768px) {
+            body { padding: 10px; }
+            .container { width: 100%; max-width: 100%; }
+            .navbar { align-items: stretch; flex-direction: column; padding: 12px; }
+            .navbar h1 { font-size: 1.25rem; }
+            .navbar-actions { width: 100%; display: grid !important; grid-template-columns: 1fr 1fr; }
+            .navbar-actions .btn { width: 100%; min-height: 44px; }
+            .card { padding: 12px; }
+            .resumo { grid-template-columns: 1fr 1fr; }
+            .filters { display: grid; grid-template-columns: 1fr; }
+            .filters select, .filters input, .filters .btn { width: 100%; min-height: 44px; }
+            table { min-width: 620px; }
+            th, td { padding: 10px 8px; }
+            .pagina { flex-wrap: wrap; }
+            .btn-pagina { min-width: 42px; min-height: 42px; }
+        }
+
+        @media (max-width: 480px) {
+            body { padding: 6px; }
+            .navbar-actions { grid-template-columns: 1fr; }
+            .resumo { grid-template-columns: 1fr; }
+            .resumo-card strong { font-size: 20px; }
+            .card h2 { font-size: 1.1rem; }
+            table { display: block; min-width: 0; }
+            thead { display: none; }
+            tbody, tr, td { display: block; width: 100%; }
+            tbody tr { margin-bottom: 12px; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden; }
+            body.dark-mode tbody tr { border-color: #475569; }
+            td { border-bottom: 1px solid #e2e8f0; white-space: normal; text-align: left; }
+            td::before { content: attr(data-label); display: block; font-size: 11px; font-weight: bold; color: #64748b; margin-bottom: 5px; text-transform: uppercase; }
+            td:last-child { border-bottom: none; }
+        }
     </style>
 </head>
 <body>
@@ -273,7 +317,7 @@
 <div class="container">
     <div class="navbar">
         <h1>📊 Auditoria</h1>
-        <div style="display: flex; gap: 10px;">
+        <div class="navbar-actions" style="display: flex; gap: 10px;">
             <button class="btn btn-primary" onclick="window.location.href='dashboard.html'">📊 DASHBOARD</button>
             <button class="btn btn-toggle" onclick="alternarTema()">🌙 Tema</button>
         </div>
@@ -308,6 +352,10 @@
                 <option value="SAIDA_REALIZADA">📤 Saídas</option>
                 <option value="LOGIN">🔓 Logins</option>
                 <option value="CONFIG_ALTERADA">⚙️ Configurações</option>
+                <option value="PRODUTO_EDITADO">✏️ Produtos editados</option>
+                <option value="PRODUTO_EXCLUIDO">🗑️ Produtos excluídos</option>
+                <option value="IMPORTACAO_EXCEL">📊 Importações Excel</option>
+                <option value="IMPORTACAO_XML">🧾 Importações XML</option>
             </select>
 
             <input type="month" id="filtroData" placeholder="Filtrar por mês e ano">
@@ -328,9 +376,8 @@ import { verificarAutenticacao } from './auth.js';
 verificarAutenticacao();
 
 import { initializeApp, getApps, getApp } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-app.js";
-import { getFirestore, collection, query, orderBy, limit, offset, getDocs } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore.js";
+import { getFirestore, collection, query, orderBy, limit, getDocs } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore.js";
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-auth.js";
-import { httpsCallable, getFunctions } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-functions.js";
 
 const firebaseConfig = {
     apiKey: "AIzaSyBVu2nD3RJg5q-CH-oyxJvn-6agQw09rsA",
@@ -344,12 +391,22 @@ const firebaseConfig = {
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 const db = getFirestore(app);
 const auth = getAuth(app);
-const functions = getFunctions(app);
-const obterAuditLogs = httpsCallable(functions, 'obterAuditLogs');
 
 let paginaAtual = 0;
 const LIMITE = 20;
 let todosOsLogs = [];
+
+function escaparHTML(texto) {
+    const div = document.createElement('div');
+    div.textContent = String(texto ?? '');
+    return div.innerHTML;
+}
+
+function protegerCSV(valor) {
+    let texto = String(valor ?? '').replaceAll('"', '""');
+    if (/^[=+\-@]/.test(texto)) texto = "'" + texto;
+    return `"${texto}"`;
+}
 
 // Tema escuro
 window.alternarTema = () => {
@@ -373,8 +430,23 @@ window.carregarLogs = async () => {
     try {
         document.getElementById('conteudo').innerHTML = '<div class="loading">⏳ Carregando logs...</div>';
         
-        const resultado = await obterAuditLogs({ limite: 1000, pagina: 0 });
-        todosOsLogs = resultado.data.logs || [];
+        const logsRef = collection(db, 'usuarios', user.uid, 'audit_logs');
+        const consultaLogs = query(logsRef, orderBy('timestamp', 'desc'), limit(1000));
+        const snapshotLogs = await getDocs(consultaLogs);
+
+        todosOsLogs = snapshotLogs.docs.map(docLog => {
+            const dados = docLog.data();
+            const timestamp = dados.timestamp?.toDate
+                ? dados.timestamp.toDate()
+                : (dados.timestamp ? new Date(dados.timestamp) : new Date());
+
+            return {
+                id: docLog.id,
+                acao: dados.acao || 'SEM ACAO',
+                dados: dados.dados || {},
+                timestamp
+            };
+        });
 
         const filtroAcao = document.getElementById('filtroAcao').value;
         const filtroData = document.getElementById('filtroData').value; // Formato: YYYY-MM
@@ -426,13 +498,15 @@ function mostrarLogs(logs) {
                         log.acao.includes('SAIDA') ? 'saida' : 
                         log.acao.includes('LOGIN') ? 'login' : 'config';
 
-        let detalhes = JSON.stringify(log.dados || {});
-        if (detalhes.length > 50) detalhes = detalhes.substring(0, 50) + '...';
+        const detalhesObjeto = log.dados || {};
+        const detalhes = Object.entries(detalhesObjeto)
+            .map(([chave, valor]) => `${chave}: ${valor}`)
+            .join(' | ') || 'Sem detalhes adicionais';
 
         html += '<tr>';
-        html += `<td>${data}</td>`;
-        html += `<td><span class="acao acao-${tipoAcao}">${log.acao}</span></td>`;
-        html += `<td><code>${detalhes}</code></td>`;
+        html += `<td data-label="Data/Hora">${escaparHTML(data)}</td>`;
+        html += `<td data-label="Ação"><span class="acao acao-${tipoAcao}">${escaparHTML(log.acao)}</span></td>`;
+        html += `<td data-label="Detalhes"><code>${escaparHTML(detalhes)}</code></td>`;
         html += '</tr>';
     });
 
@@ -484,8 +558,8 @@ window.exportarCSV = () => {
     let csv = 'Data,Ação,Detalhes\n';
     todosOsLogs.forEach(log => {
         const data = new Date(log.timestamp).toLocaleString('pt-BR');
-        const detalhes = JSON.stringify(log.dados || {}).replace(/"/g, '""');
-        csv += `"${data}","${log.acao}","${detalhes}"\n`;
+        const detalhes = JSON.stringify(log.dados || {});
+        csv += [protegerCSV(data), protegerCSV(log.acao), protegerCSV(detalhes)].join(',') + '\n';
     });
 
     const blob = new Blob([csv], { type: 'text/csv' });

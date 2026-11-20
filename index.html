@@ -385,6 +385,36 @@
         input, textarea, select, button {
             font-size: 16px;
         }
+        .produto-sugestao:hover { background: #f1f5f9; }
+        #autocompleteLista { position: relative; z-index: 20; }
+        @media (max-width: 480px) {
+            #scanner-qr,
+            #scanner-qr video { height: 180px !important; }
+            #scanner-qr { max-width: 300px; }
+            #autocompleteLista { max-height: 240px !important; }
+            .produto-sugestao { min-height: 56px; }
+        }
+
+        #scanner-qr {
+            max-width: 420px;
+            height: 220px;
+            margin: 10px auto 15px !important;
+            border-radius: 10px;
+            overflow: hidden;
+            background: #111827;
+        }
+
+        #scanner-qr[hidden] {
+            display: none !important;
+            height: 0 !important;
+            margin: 0 !important;
+        }
+
+        #scanner-qr video {
+            width: 100% !important;
+            height: 220px !important;
+            object-fit: cover;
+        }
     </style>
 </head>
 <body>
@@ -415,9 +445,9 @@
         </div>
 
         <!-- Scanner QR Code -->
-        <div id="scanner-qr" style="display: none; width: 100%; margin: 15px 0; border-radius: 8px; overflow: hidden;"></div>
+        <div id="scanner-qr" hidden></div>
 
-        <button class="button-qrcode" id="btnQRCode">📷 LER QR CODE / BIPE</button>
+        <button class="button-qrcode" id="btnQRCode" type="button">📷 ABRIR LEITOR</button>
 
         <!-- FORMULÁRIO -->
         <form id="formEstoque" onsubmit="enviarLancamento(event)">
@@ -480,6 +510,118 @@
     </div>
 </div>
 <script type="module" src="index.js"></script>
-<script type="module" src="qrcode-scanner.js"></script>
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<script>
+(() => {
+    const botao = document.getElementById('btnQRCode');
+    const area = document.getElementById('scanner-qr');
+    let leitor = null;
+    let ativo = false;
+
+    function extrairCodigo(texto) {
+        const bruto = String(texto || '').trim();
+        if (!bruto) return '';
+
+        try {
+            const json = JSON.parse(bruto);
+            if (json.codigo) return String(json.codigo).trim().toUpperCase();
+            if (json.code) return String(json.code).trim().toUpperCase();
+        } catch (_) {}
+
+        return bruto.trim().toUpperCase();
+    }
+
+    async function processarCodigo(texto) {
+        const codigo = extrairCodigo(texto);
+        if (!codigo) return;
+
+        const campo = document.getElementById('codigo');
+        if (campo) {
+            campo.value = codigo;
+            campo.dispatchEvent(new Event('input', { bubbles: true }));
+            campo.dispatchEvent(new Event('change', { bubbles: true }));
+            campo.dispatchEvent(new Event('blur', { bubbles: true }));
+        }
+
+        await parar();
+    }
+
+    async function parar() {
+        ativo = false;
+
+        if (botao) {
+            botao.textContent = '📷 ABRIR LEITOR';
+            botao.setAttribute('aria-pressed', 'false');
+        }
+
+        if (area) {
+            area.hidden = true;
+            area.style.setProperty('display', 'none', 'important');
+            area.innerHTML = '';
+        }
+
+        if (leitor) {
+            const leitorAtual = leitor;
+            leitor = null;
+            try {
+                await leitorAtual.stop();
+            } catch (_) {}
+            try {
+                leitorAtual.clear();
+            } catch (_) {}
+        }
+    }
+
+    async function iniciar() {
+        if (ativo) {
+            await parar();
+            return;
+        }
+
+        if (!navigator.mediaDevices?.getUserMedia) {
+            alert('Câmera não suportada. Use Chrome ou Edge atualizado em localhost ou HTTPS.');
+            return;
+        }
+
+        if (typeof Html5Qrcode === 'undefined') {
+            alert('O leitor não carregou. Verifique sua conexão com a internet e recarregue a página.');
+            return;
+        }
+
+        try {
+            area.hidden = false;
+            area.style.removeProperty('display');
+            area.innerHTML = '';
+
+            leitor = new Html5Qrcode('scanner-qr');
+
+            await leitor.start(
+                { facingMode: 'environment' },
+                {
+                    fps: 10,
+                    qrbox: { width: 180, height: 180 },
+                    aspectRatio: 1.0
+                },
+                (texto) => processarCodigo(texto),
+                () => {}
+            );
+
+            ativo = true;
+            botao.textContent = '⏹️ PARAR LEITOR';
+            botao.setAttribute('aria-pressed', 'true');
+        } catch (erro) {
+            console.error('Erro ao iniciar leitor:', erro);
+            await parar();
+
+            const mensagem = erro?.name === 'NotAllowedError'
+                ? 'Permissão da câmera negada. Autorize o acesso e tente novamente.'
+                : 'Não foi possível iniciar a câmera. Use Chrome ou Edge em localhost/HTTPS.';
+            alert(mensagem);
+        }
+    }
+
+    botao?.addEventListener('click', iniciar);
+})();
+</script>
 </body>
 </html>

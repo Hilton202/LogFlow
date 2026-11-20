@@ -78,4 +78,17 @@ export async function registrarMovimentacao(codigo, qtd, ref, tipo) {
     }
 }
 
+/**
+ * Função para registrar auditoria de ações dos usuários
+ */
+export async function registrarAuditoria(uid, acao, dados = {}) {
+    if (!uid) return;
+
+    await addDoc(collection(db, "usuarios", uid, "audit_logs"), {
+        acao,
+        dados,
+        timestamp: serverTimestamp()
+    });
+}
+
 export { db, auth };

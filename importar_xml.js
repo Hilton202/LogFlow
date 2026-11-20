@@ -1,6 +1,7 @@
 import { initializeApp, getApps, getApp } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-app.js";
 import { getFirestore, doc, getDoc, setDoc, addDoc, collection, serverTimestamp, increment } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore.js";
 import { getAuth } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-auth.js";
+import { registrarAuditoria } from './db.js';
 
 // 1. Configuração do Firebase
 const firebaseConfig = {
@@ -92,10 +93,15 @@ document.getElementById('btnProcessar').onclick = function() {
         const parser = new DOMParser();
         const xmlDoc = parser.parseFromString(e.target.result, "text/xml");
 
+        if (xmlDoc.querySelector('parsererror')) {
+            return alert('XML inválido ou corrompido!');
+        }
+
         let produtosXML = xmlDoc.getElementsByTagNameNS("*", "det");
         if (produtosXML.length === 0) produtosXML = xmlDoc.getElementsByTagNameNS("*", "prod");
 
         if (produtosXML.length === 0) return alert("XML inválido ou sem itens!");
+        if (produtosXML.length > 5000) return alert("Limite seguro excedido: máximo de 5.000 itens por XML.");
 
         let html = '';
         itensParaProcessar = [];
@@ -165,6 +171,10 @@ document.getElementById('btnConfirmarEntrada').onclick = async function() {
                 data: serverTimestamp()
             });
         }
+        await registrarAuditoria(user.uid, 'IMPORTACAO_XML', {
+            quantidade_itens: itensParaProcessar.length,
+            origem: 'XML'
+        });
         alert("✅ Concluído!");
         window.location.href = 'dashboard.html';
     } catch (error) {

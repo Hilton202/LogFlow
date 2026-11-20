@@ -7,10 +7,10 @@ import { initializeApp, getApps, getApp } from "https://www.gstatic.com/firebase
 import { 
     getFirestore, doc, setDoc, getDoc, addDoc, collection, 
     serverTimestamp, increment, onSnapshot, query, where, getDocs, Timestamp,
-    writeBatch
+    writeBatch, runTransaction
 } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore.js";
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-auth.js";
-import { httpsCallable, getFunctions } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-functions.js";
+import { registrarAuditoria } from './db.js';
 
 // ===== CONFIGURAÇÃO & INICIALIZAÇÃO FIREBASE =====
 const firebaseConfig = {
@@ -25,10 +25,6 @@ const firebaseConfig = {
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 const db = getFirestore(app);
 const auth = getAuth(app);
-const functions = getFunctions(app);
-
-// ===== CLOUD FUNCTIONS =====
-const lancarMovimentacao = httpsCallable(functions, 'lancarMovimentacao');
 
 // ===== ESTADOS DA APLICAÇÃO =====
 let operacaoAtual = "ENTRADA";
@@ -79,9 +75,14 @@ onAuthStateChanged(auth, (user) => {
     onSnapshot(collection(db, "usuarios", user.uid, "produtos"), (snapshot) => {
         produtosDisponiveis = {};
         snapshot.forEach(docSnap => {
+            const dados = docSnap.data();
             const codigo = docSnap.id;
-            const saldo = docSnap.data().estoque_atual || 0;
-            produtosDisponiveis[codigo] = saldo;
+            const saldo = Number(dados.estoque_atual) || 0;
+            produtosDisponiveis[codigo] = {
+                codigo,
+                nome: dados.nome || codigo,
+                saldo
+            };
         });
         console.log("📦 Produtos em cache:", Object.keys(produtosDisponiveis).length);
     });
@@ -132,40 +133,131 @@ if (elCodigo) {
 }
 
 // ===== AUTOCOMPLETE / FILTRO DE PRODUTOS =====
-const inputProduto = document.getElementById('inputProduto');
+const inputProduto = document.getElementById('codigo');
 const autocompleteLista = document.getElementById('autocompleteLista');
 
-if (inputProduto && autocompleteLista) {
-    inputProduto.addEventListener('input', () => {
-        const valor = inputProduto.value.toUpperCase();
-        
-        if (valor.length < 1) {
-            autocompleteLista.style.display = 'none';
-            return;
-        }
+function escaparHTML(texto) {
+    const div = document.createElement('div');
+    div.textContent = String(texto ?? '');
+    return div.innerHTML;
+}
 
-        const produtos = Object.keys(produtosDisponiveis)
-            .filter(p => p.includes(valor))
-            .slice(0, 5);
+function mostrarSugestoesProdutos() {
+    if (!inputProduto || !autocompleteLista) return;
 
-        if (produtos.length === 0) {
-            autocompleteLista.style.display = 'none';
-            return;
-        }
+    const valor = inputProduto.value.trim().toUpperCase();
+    const produtos = Object.values(produtosDisponiveis)
+        .filter(produto => {
+            if (!valor) return true;
+            return produto.codigo.toUpperCase().includes(valor)
+                || produto.nome.toUpperCase().includes(valor);
+        })
+        .sort((a, b) => a.codigo.localeCompare(b.codigo))
+        .slice(0, 10);
 
-        autocompleteLista.innerHTML = produtos
-            .map(p => `<div onclick="selecionarProduto('${p}', ${produtosDisponiveis[p]})">${p} (${produtosDisponiveis[p]} un)</div>`)
-            .join('');
-        
+    if (produtos.length === 0) {
+        autocompleteLista.innerHTML = '<div style="padding: 12px; color: #64748b;">Nenhum produto encontrado</div>';
         autocompleteLista.style.display = 'block';
+        return;
+    }
+
+    autocompleteLista.innerHTML = produtos.map(produto => `
+        <div class="produto-sugestao" data-codigo="${escaparHTML(produto.codigo)}" style="padding: 10px; cursor: pointer; border-bottom: 1px solid #e2e8f0;">
+            <strong>${escaparHTML(produto.codigo)}</strong>
+            <div>${escaparHTML(produto.nome)}</div>
+            <small>Saldo: ${produto.saldo} unidades</small>
+        </div>
+    `).join('');
+
+    autocompleteLista.style.display = 'block';
+
+    autocompleteLista.querySelectorAll('.produto-sugestao').forEach(item => {
+        item.addEventListener('mousedown', (evento) => {
+            evento.preventDefault();
+            selecionarProduto(item.dataset.codigo);
+        });
     });
 }
 
-window.selecionarProduto = (codigo, saldo) => {
-    if (inputProduto) inputProduto.value = codigo;
+if (inputProduto && autocompleteLista) {
+    inputProduto.addEventListener('input', mostrarSugestoesProdutos);
+    inputProduto.addEventListener('focus', mostrarSugestoesProdutos);
+}
+
+window.selecionarProduto = (codigo) => {
+    const produto = produtosDisponiveis[codigo];
+    if (!inputProduto || !produto) return;
+
+    inputProduto.value = produto.codigo;
     if (autocompleteLista) autocompleteLista.style.display = 'none';
-    console.log(`✅ Produto selecionado: ${codigo} (${saldo} un)`);
+
+    const saldoSpan = document.getElementById('saldoAtual');
+    const alertaDiv = document.getElementById('alertaEstoque');
+    if (saldoSpan) saldoSpan.innerText = produto.saldo;
+    if (alertaDiv) alertaDiv.style.display = 'block';
 };
+
+// ===== MOVIMENTAÇÕES =====
+// Execução direta por transação enquanto a hospedagem da Cloud Function não estiver disponível.
+async function lancarMovimentacao(dados) {
+    const user = auth.currentUser;
+    if (!user) throw new Error('Usuário não autenticado');
+
+    const { codigo, quantidade, tipo, referencia } = dados;
+    const codigoLimpo = codigo.trim().toUpperCase();
+
+    if (!codigoLimpo || !Number.isFinite(quantidade) || quantidade <= 0) {
+        throw new Error('Dados inválidos para a movimentação');
+    }
+
+    const produtoRef = doc(db, 'usuarios', user.uid, 'produtos', codigoLimpo);
+    const movimentoRef = doc(collection(db, 'usuarios', user.uid, 'movimentacoes'));
+    const auditoriaRef = doc(collection(db, 'usuarios', user.uid, 'audit_logs'));
+
+    await runTransaction(db, async (transaction) => {
+        const produtoSnap = await transaction.get(produtoRef);
+        const saldoAtual = produtoSnap.exists()
+            ? Number(produtoSnap.data().estoque_atual || 0)
+            : 0;
+
+        if (tipo === 'SAIDA' && quantidade > saldoAtual) {
+            const erro = new Error('Saldo insuficiente');
+            erro.codigoAplicacao = 'FAILED_PRECONDITION';
+            erro.saldoAtual = saldoAtual;
+            throw erro;
+        }
+
+        const novoSaldo = tipo === 'ENTRADA'
+            ? saldoAtual + quantidade
+            : saldoAtual - quantidade;
+
+        transaction.set(produtoRef, {
+            codigo: codigoLimpo,
+            estoque_atual: novoSaldo,
+            ultima_atualizacao: serverTimestamp()
+        }, { merge: true });
+
+        transaction.set(movimentoRef, {
+            codigo: codigoLimpo,
+            quantidade,
+            tipo,
+            referencia: referencia || 'SEM REF',
+            data: serverTimestamp()
+        });
+
+        transaction.set(auditoriaRef, {
+            acao: tipo === 'ENTRADA' ? 'ENTRADA_REALIZADA' : 'SAIDA_REALIZADA',
+            dados: {
+                codigo: codigoLimpo,
+                quantidade,
+                referencia: referencia || 'SEM REF'
+            },
+            timestamp: serverTimestamp()
+        });
+    });
+
+    return { data: { mensagem: `${tipo === 'ENTRADA' ? 'Entrada' : 'Saída'} registrada com sucesso!` } };
+}
 
 // ===== ENVIO DE LANÇAMENTO =====
 window.enviarLancamento = async (event) => {
@@ -225,13 +317,11 @@ window.enviarLancamento = async (event) => {
         tentativasFalhadas++;
         
         let textoErro = error.message;
-        if (error.code === 'resource_exhausted') {
+        if (error.codigoAplicacao === 'FAILED_PRECONDITION') {
+            textoErro = `❌ SALDO INSUFICIENTE!\nVocê tem: ${error.saldoAtual} unidades`;
+        } else if (error.code === 'resource_exhausted') {
             textoErro = `⚠️ MUITAS TENTATIVAS!\nAguarde ${error.details?.proximaTentativaEm || ''} segundos`;
         } else if (error.code === 'failed-precondition') {
-            textoErro = `❌ SALDO INSUFICIENTE!\nVocê tem: ${error.details?.saldoAtual} unidades`;
-        } else if (error.code === 'not-found') {
-            textoErro = `❌ PRODUTO NÃO ENCONTRADO!`;
-        } else if (error.code === 'invalid-argument') {
             textoErro = `⚠️ DADOS INVÁLIDOS!\n${error.message}`;
         }
 
@@ -263,5 +353,13 @@ const formEstoque = document.getElementById('formEstoque');
 if (formEstoque) {
     formEstoque.onsubmit = window.enviarLancamento;
 }
+
+// ===== FECHAR LISTA DE SUGESTÕES AO CLICAR FORA =====
+document.addEventListener('click', (evento) => {
+    if (!autocompleteLista || !inputProduto) return;
+    if (evento.target !== inputProduto && !autocompleteLista.contains(evento.target)) {
+        autocompleteLista.style.display = 'none';
+    }
+});
 
 console.log("✅ Script de estoque otimizado e carregado com sucesso!");

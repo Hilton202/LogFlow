@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>LogFlow - Dashboard</title>
+    <link rel="shortcut icon" href="img/logflow_logo.png" type="image/png">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <style>
@@ -239,23 +240,442 @@
             font-size: 12px;
         }
 
+        .chart-card,
+        .table-card,
+        .stat-card,
+        .charts-container,
+        .stats,
+        .navbar,
+        .container {
+            min-width: 0;
+            max-width: 100%;
+        }
+
+        .chart-card canvas,
+        .chart-card {
+            width: 100% !important;
+        }
+
+        .produto-nome {
+            font-weight: 700;
+            color: #1e293b;
+            line-height: 1.35;
+        }
+
+        body.dark-mode .produto-nome { color: #f1f5f9; }
+
+        .produto-codigo {
+            display: inline-block;
+            margin-top: 4px;
+            color: #64748b;
+            background: #f1f5f9;
+            border-radius: 4px;
+            padding: 2px 6px;
+            font-size: 12px;
+        }
+
+        body.dark-mode .produto-codigo { color: #cbd5e1; background: #334155; }
+
+        .dado-estoque { font-size: 20px; color: #001F5B; }
+        body.dark-mode .dado-estoque { color: #00d4ff; }
+
+        .status-produto {
+            display: inline-block;
+            min-width: 88px;
+            text-align: center;
+            border-radius: 999px;
+            padding: 6px 9px;
+            font-weight: 700;
+            font-size: 12px;
+        }
+
+        .status-produto.ok { background: #dcfce7; color: #166534; }
+        .status-produto.critico { background: #fee2e2; color: #991b1b; }
+
+        .btnEditar,
+        .btnExcluir {
+            border: 0;
+            border-radius: 6px;
+            padding: 7px 9px;
+            cursor: pointer;
+            font-weight: 700;
+            font-size: 12px;
+        }
+
+        .btnEditar { background: #dbeafe; color: #1e40af; }
+        .btnExcluir { background: #fee2e2; color: #991b1b; margin-left: 4px; }
+
+        .relatorio-entrada,
+        .relatorio-saida,
+        .relatorio-liquido {
+            display: inline-block;
+            min-width: 72px;
+            text-align: center;
+            border-radius: 999px;
+            padding: 6px 8px;
+            font-size: 14px;
+        }
+
+        .relatorio-entrada { background: #dcfce7; color: #166534; }
+        .relatorio-saida { background: #fee2e2; color: #991b1b; }
+        .relatorio-liquido.positivo { background: #dbeafe; color: #1e40af; }
+        .relatorio-liquido.negativo { background: #ffedd5; color: #9a3412; }
+
         @media (max-width: 768px) {
-            .navbar {
-                flex-direction: column;
-                align-items: flex-start;
+            body { padding: 10px; overflow-x: hidden; }
+            .container { width: 100%; max-width: 100%; padding: 0; }
+            .navbar { width: 100%; }
+            .navbar h1 { width: 100%; text-align: center; }
+            .navbar, .navbar-actions, .actions { flex-direction: column; align-items: stretch; }
+            .navbar-actions, .actions { width: 100%; }
+            .navbar-actions .btn, .actions .btn, .navbar-actions a { width: 100%; }
+            .stats { grid-template-columns: 1fr 1fr; }
+            .charts-container { grid-template-columns: minmax(0, 1fr); }
+            .chart-card { overflow: hidden; }
+            .chart-card canvas { height: 220px !important; }
+            .table-card { padding: 12px; overflow-x: auto; }
+            table { min-width: 680px; }
+            th, td { padding: 9px 8px; }
+            #controlesPaginacao { width: 100%; }
+            #controlesPaginacao .btn { flex: 1; }
+        }
+
+        @media (max-width: 480px) {
+            body { padding: 6px; }
+
+            #tabelaProdutos,
+            #tabelaRelatorioAnual {
+                min-width: 0 !important;
+                display: block;
             }
 
-            .charts-container {
-                grid-template-columns: 1fr;
+            #tabelaProdutos thead,
+            #tabelaRelatorioAnual thead {
+                display: none;
             }
 
-            .actions {
-                flex-direction: column;
-            }
-
-            .btn {
+            #tabelaProdutos tbody,
+            #tabelaRelatorioAnual tbody,
+            #tabelaProdutos tr,
+            #tabelaRelatorioAnual tr,
+            #tabelaProdutos td,
+            #tabelaRelatorioAnual td {
+                display: block;
                 width: 100%;
             }
+
+            #tabelaProdutos tr,
+            #tabelaRelatorioAnual tr {
+                background: white;
+                border: 1px solid #e2e8f0;
+                border-radius: 8px;
+                margin-bottom: 10px;
+                padding: 6px;
+            }
+
+            body.dark-mode #tabelaProdutos tr,
+            body.dark-mode #tabelaRelatorioAnual tr {
+                background: #1a202c;
+                border-color: #334155;
+            }
+
+            #tabelaProdutos td,
+            #tabelaRelatorioAnual td {
+                border: 0;
+                text-align: left;
+                padding: 7px 8px;
+            }
+
+            #tabelaProdutos td:last-child {
+                display: flex;
+                gap: 8px;
+                flex-wrap: wrap;
+            }
+
+            #controlesPaginacao { gap: 6px; }
+            #indicadorPagina { width: 100%; order: -1; }
+
+            .stats { grid-template-columns: 1fr; }
+            .chart-card, .table-card, .stat-card { padding: 12px; }
+            .navbar h1 { font-size: 1.15rem; }
+            #pesquisa, #anoRelatorio { width: 100%; }
+            .chart-card canvas { height: 190px !important; }
+            .navbar-actions { gap: 6px; }
+            .actions { gap: 6px; }
+
+            #tabelaProdutos tr {
+                display: grid !important;
+                grid-template-columns: repeat(6, minmax(0, 1fr));
+                grid-auto-flow: row;
+                row-gap: 10px;
+                align-items: start;
+                box-sizing: border-box;
+                padding: 12px;
+                border-radius: 12px;
+            }
+
+            #tabelaProdutos td[data-label="Produto"] {
+                grid-column: 1 / -1;
+                min-height: 98px;
+                display: flex;
+                flex-direction: column;
+                justify-content: center;
+                padding: 16px 12px 14px 12px !important;
+                border-bottom: 1px solid #e8edf4;
+            }
+
+            #tabelaProdutos td[data-label="Saldo"] {
+                grid-column: 1 / 3;
+            }
+
+            #tabelaProdutos td[data-label="Giro mensal"] {
+                grid-column: 3 / 5;
+            }
+
+            #tabelaProdutos td[data-label="Cobertura"] {
+                grid-column: 5 / 7;
+            }
+
+            #tabelaProdutos td[data-label="Saldo"],
+            #tabelaProdutos td[data-label="Giro mensal"],
+            #tabelaProdutos td[data-label="Cobertura"] {
+                width: 100% !important;
+                min-height: 88px;
+                display: flex !important;
+                flex-direction: column;
+                justify-content: center;
+                box-sizing: border-box;
+                padding: 12px 8px 10px 8px !important;
+                border-left: 0;
+            }
+
+            #tabelaProdutos td[data-label="Giro mensal"],
+            #tabelaProdutos td[data-label="Cobertura"] {
+                border-left: 1px solid #e8edf4;
+            }
+
+            #tabelaProdutos td[data-label="Status"] {
+                grid-column: 1 / 3;
+                min-height: 112px;
+                padding: 12px 12px 10px 12px !important;
+            }
+
+            #tabelaProdutos td[data-label="Ações"] {
+                grid-column: 3 / 7;
+                display: grid !important;
+                grid-template-columns: 1fr;
+                grid-template-rows: auto 46px 46px;
+                align-content: center;
+                gap: 8px !important;
+                min-height: 112px;
+                padding: 12px 12px 12px 12px !important;
+            }
+
+            #tabelaProdutos td[data-label="Ações"]::before {
+                display: block;
+                margin: 0 0 2px 0;
+                text-align: left;
+                color: #64748b;
+                font-size: 9px;
+                font-weight: 700;
+            }
+
+            #tabelaProdutos td[data-label="Ações"] .btnEditar,
+            #tabelaProdutos td[data-label="Ações"] .btnExcluir {
+                width: 100% !important;
+                min-width: 0;
+                max-width: none;
+                height: 46px;
+                margin: 0 !important;
+                padding: 10px 8px !important;
+                font-size: 12px;
+                font-weight: 800;
+                line-height: 1;
+                white-space: nowrap;
+                border: 0;
+                border-radius: 8px;
+            }
+
+            #tabelaProdutos td[data-label="Ações"] .btnEditar {
+                background-color: #dbeafe !important;
+                color: #1e40af !important;
+            }
+
+            #tabelaProdutos td[data-label="Ações"] .btnExcluir {
+                background-color: #fee2e2 !important;
+                color: #991b1b !important;
+            }
+        }
+
+        #tabelaProdutos td[data-label]::before,
+        #tabelaRelatorioAnual td[data-label]::before {
+            content: attr(data-label);
+            display: block;
+            color: #64748b;
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            margin-bottom: 7px;
+        }
+
+        #tabelaProdutos td[data-label="Giro mensal"],
+        #tabelaProdutos td[data-label="Cobertura"] {
+            border-left: 1px solid #e8edf4;
+        }
+
+        body.dark-mode #tabelaProdutos td[data-label="Giro mensal"],
+        body.dark-mode #tabelaProdutos td[data-label="Cobertura"] {
+            border-left-color: #334155;
+        }
+
+        #tabelaProdutos td[data-label="Saldo"],
+        #tabelaProdutos td[data-label="Giro mensal"],
+        #tabelaProdutos td[data-label="Cobertura"] {
+            width: 33.333%;
+            display: inline-block;
+            vertical-align: top;
+        }
+
+        #tabelaProdutos td[data-label="Status"],
+        #tabelaProdutos td[data-label="Ações"] {
+            width: 50%;
+            display: inline-block;
+            vertical-align: top;
+            min-height: 62px;
+        }
+
+        #tabelaProdutos td[data-label="Produto"] {
+            min-height: 72px;
+            display: grid;
+            align-content: start;
+        }
+
+        #tabelaProdutos td[data-label="Ações"] {
+            text-align: right;
+        }
+
+        #tabelaProdutos td[data-label="Ações"] .btnEditar,
+        #tabelaProdutos td[data-label="Ações"] .btnExcluir {
+            min-height: 38px;
+            vertical-align: middle;
+        }
+
+        #tabelaRelatorioAnual td[data-label="Entradas"],
+        #tabelaRelatorioAnual td[data-label="Saídas"],
+        #tabelaRelatorioAnual td[data-label="Saldo líquido"] {
+            width: 33.333%;
+            display: inline-block;
+            vertical-align: top;
+        }
+
+        .controles-relatorio {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            margin-top: 10px;
+        }
+
+        .controles-relatorio .btn {
+            min-width: 48px;
+            padding: 8px;
+        }
+
+        #indicadorRelatorio {
+            min-width: 110px;
+            text-align: center;
+            font-size: 13px;
+            font-weight: 700;
+        }
+
+        @media (max-width: 480px) {
+            #tabelaProdutos td[data-label="Ações"] {
+                gap: 16px !important;
+                padding: 10px 8px 10px 8px !important;
+            }
+
+            #tabelaProdutos td[data-label="Ações"] .btnEditar,
+            #tabelaProdutos td[data-label="Ações"] .btnExcluir {
+                width: auto !important;
+                flex: 1 1 0;
+                min-width: 0;
+                max-width: none;
+                height: 44px;
+                margin: 0 !important;
+                padding: 10px 4px !important;
+                font-size: 12px;
+                font-weight: 800;
+                line-height: 1;
+                white-space: nowrap;
+                border: 0;
+                border-radius: 8px;
+            }
+
+            #tabelaProdutos td[data-label="Ações"] .btnEditar {
+                background-color: #dbeafe !important;
+                color: #1e40af !important;
+            }
+
+            #tabelaProdutos td[data-label="Ações"] .btnExcluir {
+                background-color: #fee2e2 !important;
+                color: #991b1b !important;
+            }
+        }
+
+        #tabelaRelatorioAnual tr {
+            display: table-row !important;
+        }
+
+        #tabelaRelatorioAnual td {
+            display: table-cell !important;
+            vertical-align: middle !important;
+        }
+
+        #tabelaRelatorioAnual td[data-label="Produto"] {
+            display: block;
+            width: 100%;
+        }
+
+        #tabelaRelatorioAnual td[data-label="Entradas"],
+        #tabelaRelatorioAnual td[data-label="Saídas"],
+        #tabelaRelatorioAnual td[data-label="Saldo líquido"] {
+            display: inline-block;
+            width: calc(33.333% - 10px);
+            vertical-align: top;
+        }
+
+        #tabelaRelatorioAnual td[data-label="Entradas"] {
+            text-align: right;
+        }
+
+        #tabelaRelatorioAnual td[data-label="Saídas"] {
+            text-align: right;
+        }
+
+        #tabelaRelatorioAnual td[data-label="Saldo líquido"] {
+            text-align: right;
+        }
+
+        #tabelaRelatorioAnual .controles-relatorio {
+            justify-content: flex-end;
+        }
+
+        #tabelaRelatorioAnual .btn {
+            min-width: 40px;
+            padding: 6px;
+            font-size: 12px;
+        }
+
+        #tabelaProdutos td[data-label="Status"]::before,
+        #tabelaProdutos td[data-label="Ações"]::before {
+            font-size: 9px;
+            margin-bottom: 4px;
+        }
+
+        #tabelaProdutos .status-produto {
+            min-width: 82px;
+            padding: 5px 7px;
+            font-size: 11px;
         }
     </style>
 </head>
@@ -322,21 +742,47 @@
                style="width: 100%; padding: 10px; margin-bottom: 15px; border: 1px solid #e2e8f0; border-radius: 5px;">
         
         <table id="tabelaProdutos">
-            <thead>
-                <tr>
-                    <th>Produto</th>
-                    <th>Saldo</th>
-                    <th>Giro (30D)</th>
-                    <th>Cobertura</th>
-                    <th>Status</th>
-                </tr>
-            </thead>
             <tbody>
                 <tr>
-                    <td colspan="5" style="text-align: center; color: #999;">Carregando produtos...</td>
+                    <td colspan="6" style="text-align: center; color: #999;">Carregando produtos...</td>
                 </tr>
             </tbody>
         </table>
+
+        <div id="controlesPaginacao" style="display: flex; align-items: center; justify-content: center; gap: 12px; margin-top: 14px; flex-wrap: wrap;">
+            <button type="button" class="btn btn-primary" id="btnAnterior" onclick="paginaAnterior()">⬅️ Anterior</button>
+            <span id="indicadorPagina" style="min-width: 120px; text-align: center; font-weight: 700;">Página 1 de 1</span>
+            <button type="button" class="btn btn-primary" id="btnProximo" onclick="proximaPagina()">Próxima ➡️</button>
+        </div>
+    </div>
+
+    <!-- RELATÓRIO ANUAL -->
+    <div class="table-card" style="margin-bottom: 20px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap;">
+            <h3 style="color: #001F5B;">📊 Relatório Anual de Movimentações</h3>
+            <div style="display: flex; gap: 10px;">
+                <select id="anoRelatorio" aria-label="Ano do relatório"></select>
+                <button class="btn btn-primary" onclick="exportarRelatorioAnualCSV()">⬇️ Exportar CSV</button>
+            </div>
+        </div>
+        <table id="tabelaRelatorioAnual" style="width: 100%; margin-top: 15px;">
+            <thead>
+                <tr>
+                    <th>Produto</th>
+                    <th>Entradas no ano</th>
+                    <th>Saídas no ano</th>
+                    <th>Saldo líquido</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr><td colspan="4" style="text-align: center;">Carregando relatório...</td></tr>
+            </tbody>
+        </table>
+        <div id="controlesRelatorio" class="controles-relatorio">
+            <button type="button" class="btn btn-primary" id="btnRelatorioAnterior">⬅️</button>
+            <span id="indicadorRelatorio">Página 1 de 1</span>
+            <button type="button" class="btn btn-primary" id="btnRelatorioProximo">➡️</button>
+        </div>
     </div>
 </div>
 

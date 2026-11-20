@@ -233,6 +233,34 @@
             background: #ccc;
             cursor: not-allowed;
         }
+
+        .mensagem-tentativas,
+        .contador-suspensao {
+            margin-bottom: 15px;
+            padding: 12px;
+            border-radius: 6px;
+            text-align: center;
+            font-size: 14px;
+        }
+
+        .mensagem-tentativas {
+            background: #fff7ed;
+            border: 1px solid #fdba74;
+            color: #9a3412;
+        }
+
+        .contador-suspensao {
+            background: #fee2e2;
+            border: 1px solid #ef4444;
+            color: #991b1b;
+            font-weight: bold;
+        }
+
+        @media (max-width: 480px) {
+            body { padding: 10px; }
+            .login-container, .modal-content { width: calc(100% - 20px); max-width: 400px; padding: 24px 18px; }
+            input, button { min-height: 44px; }
+        }
     </style>
 </head>
 <body>
@@ -242,6 +270,9 @@
         <img src="img/logflow_logo.png" alt="LogFlow">
         <h1>LogFlow</h1>
     </div>
+
+    <div id="mensagemTentativas" class="mensagem-tentativas" style="display: none;"></div>
+    <div id="contadorSuspensao" class="contador-suspensao" style="display: none;"></div>
 
     <form id="loginForm">
         <div class="form-group">
